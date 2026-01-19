@@ -193,47 +193,54 @@ export function SpendingChart({ transactions }: SpendingChartProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="mx-auto aspect-square h-[200px]">
-          <PieChart>
-            <Tooltip
-              content={({ active, payload }) => {
-                if (!active || !payload?.length) return null
-                const data = payload[0].payload
-                return (
-                  <div className="rounded-lg border bg-background px-3 py-2 shadow-md">
-                    <p className="font-medium">{chartConfig[data.name]?.label || data.name}</p>
-                    <p className="text-muted-foreground">{formatCurrency(data.value)}</p>
-                  </div>
-                )
-              }}
-            />
-            <Pie
-              data={chartData}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={50}
-              outerRadius={80}
-              paddingAngle={2}
-            >
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.fill} />
-              ))}
-            </Pie>
-          </PieChart>
-        </ChartContainer>
-        <div className="mt-4 text-center">
-          <p className="text-2xl font-bold">{formatCurrency(total)}</p>
-          <p className="text-sm text-muted-foreground">Total gastado {filterLabels[activeFilter]}</p>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          {data.slice(0, 4).map((item) => (
-            <div key={item.name} className="flex items-center gap-2">
-              <div className="size-3 rounded-full" style={{ backgroundColor: item.color }} />
-              <span className="text-xs text-muted-foreground truncate">{item.name_es}</span>
+        <div className="flex flex-col items-center md:flex-row md:justify-center gap-6">
+          {/* Columna izquierda: Donut */}
+          <ChartContainer config={chartConfig} className="aspect-square h-[200px] flex-shrink-0">
+            <PieChart>
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null
+                  const data = payload[0].payload
+                  return (
+                    <div className="rounded-lg border bg-background px-3 py-2 shadow-md">
+                      <p className="font-medium">{chartConfig[data.name]?.label || data.name}</p>
+                      <p className="text-muted-foreground">{formatCurrency(data.value)}</p>
+                    </div>
+                  )
+                }}
+              />
+              <Pie
+                data={chartData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={80}
+                paddingAngle={2}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ChartContainer>
+
+          {/* Columna derecha: Total + Categorías */}
+          <div className="flex flex-col">
+            <div className="text-center md:text-left">
+              <p className="text-2xl font-bold">{formatCurrency(total)}</p>
+              <p className="text-sm text-muted-foreground">Total gastado {filterLabels[activeFilter]}</p>
             </div>
-          ))}
+            <div className="mt-4 flex flex-col items-center md:items-start gap-2">
+              {data.slice(0, 4).map((item) => (
+                <div key={item.name} className="flex items-center gap-2">
+                  <div className="size-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-xs text-muted-foreground truncate">{item.name_es}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
