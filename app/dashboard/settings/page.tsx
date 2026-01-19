@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [whatsappNumber, setWhatsappNumber] = useState("")
+  const [userEmail, setUserEmail] = useState("")
   
   // Notification preferences (stored in localStorage for now)
   const [emailNotifications, setEmailNotifications] = useState(true)
@@ -35,8 +36,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     async function loadProfile() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      // Use getSession for client-side - more reliable for getting user email
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      
+      const user = session.user
+      
+      // Capture user email from session
+      setUserEmail(user.email || "")
       
       const { data } = await supabase
         .from("profiles")
@@ -168,10 +175,9 @@ export default function SettingsPage() {
                 <Input
                   id="email"
                   type="email"
-                  value={profile?.id ? "" : ""}
+                  value={userEmail}
                   disabled
                   className="bg-muted"
-                  placeholder={locale === "es" ? "Correo no disponible" : "Email not available"}
                 />
                 <p className="text-xs text-muted-foreground">
                   {locale === "es" 
