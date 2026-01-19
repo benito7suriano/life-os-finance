@@ -4,7 +4,7 @@ import { useState, useMemo } from "react"
 import { PieChart, Pie, Cell, Tooltip } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart"
-import { formatCurrency } from "@/lib/utils/format"
+import { formatCurrency, parseDateString } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
 type TimeFilter = "1d" | "1w" | "1m" | "1y" | "all"
@@ -80,7 +80,7 @@ export function SpendingChart({ transactions }: SpendingChartProps) {
     const filtered = transactions.filter((t) => {
       if (t.category?.type !== "expense") return false
       if (!threshold) return true
-      const txDate = new Date(t.transaction_date)
+      const txDate = parseDateString(t.transaction_date)
       return txDate >= threshold
     })
 

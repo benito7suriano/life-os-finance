@@ -4,7 +4,7 @@ import { useState, useMemo } from "react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart"
-import { formatCurrency } from "@/lib/utils/format"
+import { formatCurrency, parseDateString } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
 type TimeFilter = "d" | "s" | "m" | "a"
@@ -98,7 +98,7 @@ function groupByWeek(transactions: Transaction[]): { label: string; income: numb
     weekEnd.setHours(23, 59, 59, 999)
 
     const weekTransactions = transactions.filter((t) => {
-      const txDate = new Date(t.transaction_date)
+      const txDate = parseDateString(t.transaction_date)
       return txDate >= weekStart && txDate <= weekEnd
     })
 
@@ -160,7 +160,7 @@ function groupByYear(transactions: Transaction[]): { label: string; income: numb
   // Get all unique years from transactions
   const years = new Set<number>()
   transactions.forEach((t) => {
-    const year = new Date(t.transaction_date).getFullYear()
+    const year = parseDateString(t.transaction_date).getFullYear()
     years.add(year)
   })
 

@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { MoreHorizontal, Pencil, Trash2, Calendar, AlertTriangle } from "lucide-react"
-import { formatCurrency, formatDate } from "@/lib/utils/format"
+import { formatCurrency, formatDate, parseDateString } from "@/lib/utils/format"
 import { useState } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -112,7 +112,7 @@ export function BudgetList({ budgets, spending, loading, locale, onEdit, onDelet
           const categoryName = locale === "es" ? budget.category.name_es : budget.category.name
 
           const today = new Date()
-          const endDate = new Date(budget.end_date)
+          const endDate = parseDateString(budget.end_date)
           const isExpired = endDate < today
 
           return (

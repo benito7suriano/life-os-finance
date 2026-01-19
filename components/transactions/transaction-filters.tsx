@@ -21,6 +21,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Search, X, CalendarIcon, Filter } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { parseDateString } from "@/lib/utils/format"
 import type { Category, Account } from "@/lib/database.types"
 
 interface TransactionFiltersProps {
@@ -168,8 +169,8 @@ export function TransactionFilters({
                 mode="range"
                 locale={es}
                 selected={{
-                  from: currentFilters.startDate ? new Date(currentFilters.startDate) : undefined,
-                  to: currentFilters.endDate ? new Date(currentFilters.endDate) : undefined,
+                  from: currentFilters.startDate ? parseDateString(currentFilters.startDate) : undefined,
+                  to: currentFilters.endDate ? parseDateString(currentFilters.endDate) : undefined,
                 }}
                 onSelect={(range) => {
                   if (range?.from) {
@@ -240,7 +241,7 @@ export function TransactionFilters({
 
           {currentFilters.startDate && (
             <Badge variant="secondary" className="gap-1">
-              Desde: {format(new Date(currentFilters.startDate), "dd/MM/yyyy")}
+              Desde: {format(parseDateString(currentFilters.startDate), "dd/MM/yyyy")}
               <button onClick={() => updateFilter("startDate", "")}>
                 <X className="size-3" />
               </button>
@@ -249,7 +250,7 @@ export function TransactionFilters({
 
           {currentFilters.endDate && (
             <Badge variant="secondary" className="gap-1">
-              Hasta: {format(new Date(currentFilters.endDate), "dd/MM/yyyy")}
+              Hasta: {format(parseDateString(currentFilters.endDate), "dd/MM/yyyy")}
               <button onClick={() => updateFilter("endDate", "")}>
                 <X className="size-3" />
               </button>

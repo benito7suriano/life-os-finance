@@ -28,6 +28,7 @@ import { CalendarIcon, Sparkles, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
+import { parseDateString } from "@/lib/utils/format"
 import type { Category, Account, Transaction } from "@/lib/database.types"
 
 interface TransactionFormProps {
@@ -65,7 +66,7 @@ export function TransactionForm({
   const [categoryId, setCategoryId] = useState(transaction?.category_id || "")
   const [accountId, setAccountId] = useState(transaction?.account_id || "")
   const [transactionDate, setTransactionDate] = useState<Date>(
-    transaction?.transaction_date ? new Date(transaction.transaction_date) : new Date()
+    transaction?.transaction_date ? parseDateString(transaction.transaction_date) : new Date()
   )
   const [aiConfidence, setAiConfidence] = useState<number | null>(
     transaction?.ai_confidence ?? null

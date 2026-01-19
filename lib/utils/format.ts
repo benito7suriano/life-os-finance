@@ -1,6 +1,12 @@
+// Parse date string (YYYY-MM-DD) as local date without timezone conversion
+export function parseDateString(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number)
+  return new Date(year, month - 1, day)
+}
+
 // Date formatting for Latin American conventions
 export function formatDate(date: Date | string, locale: "es" | "en" = "es"): string {
-  const d = typeof date === "string" ? new Date(date) : date
+  const d = typeof date === "string" ? parseDateString(date) : date
 
   return d.toLocaleDateString(locale === "es" ? "es-SV" : "en-US", {
     day: "2-digit",
@@ -10,7 +16,7 @@ export function formatDate(date: Date | string, locale: "es" | "en" = "es"): str
 }
 
 export function formatDateLong(date: Date | string, locale: "es" | "en" = "es"): string {
-  const d = typeof date === "string" ? new Date(date) : date
+  const d = typeof date === "string" ? parseDateString(date) : date
 
   return d.toLocaleDateString(locale === "es" ? "es-SV" : "en-US", {
     day: "numeric",
@@ -49,7 +55,7 @@ export function formatPercentage(value: number, decimals = 0): string {
 
 // Relative time formatting
 export function formatRelativeTime(date: Date | string, locale: "es" | "en" = "es"): string {
-  const d = typeof date === "string" ? new Date(date) : date
+  const d = typeof date === "string" ? parseDateString(date) : date
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - d.getTime()) / 1000)
 
