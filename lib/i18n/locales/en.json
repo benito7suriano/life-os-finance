@@ -1,0 +1,166 @@
+{
+  "common": {
+    "appName": "Ledger",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "search": "Search",
+    "filter": "Filter",
+    "all": "All",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "success": "Success",
+    "error": "Error",
+    "currency": "USD"
+  },
+  "auth": {
+    "login": "Log In",
+    "signup": "Sign Up",
+    "logout": "Log Out",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "forgotPassword": "Forgot Password?",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "loginSuccess": "Welcome back!",
+    "signupSuccess": "Account created! Please check your email to verify.",
+    "loginError": "Invalid email or password",
+    "signupError": "Could not create account"
+  },
+  "landing": {
+    "hero": {
+      "title": "Master Your Finances with AI",
+      "subtitle": "The smart way to track expenses in El Salvador. Connect WhatsApp, scan receipts, and let AI categorize your spending automatically.",
+      "cta": "Join the Waitlist",
+      "ctaSecondary": "Learn More"
+    },
+    "features": {
+      "title": "Everything You Need",
+      "whatsapp": {
+        "title": "WhatsApp Integration",
+        "description": "Forward your bank notifications and we'll automatically track your transactions."
+      },
+      "ai": {
+        "title": "AI Categorization",
+        "description": "Smart AI automatically categorizes your expenses so you don't have to."
+      },
+      "insights": {
+        "title": "Spending Insights",
+        "description": "Beautiful charts and reports to understand where your money goes."
+      }
+    },
+    "waitlist": {
+      "title": "Be the First to Know",
+      "subtitle": "Join our waitlist and get early access to Ledger.",
+      "namePlaceholder": "Your name",
+      "emailPlaceholder": "your@email.com",
+      "referralPlaceholder": "How did you hear about us?",
+      "success": "You're on the list! We'll be in touch soon.",
+      "error": "Something went wrong. Please try again."
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back",
+    "totalBalance": "Net worth",
+    "monthlySpending": "Monthly Spending",
+    "monthlyIncome": "Monthly Income",
+    "recentTransactions": "Recent Transactions",
+    "viewAll": "View All",
+    "quickActions": "Quick Actions",
+    "addTransaction": "Add Transaction",
+    "connectWhatsApp": "Connect WhatsApp",
+    "needsReview": "Needs Review",
+    "noTransactions": "No transactions yet"
+  },
+  "transactions": {
+    "title": "Transactions",
+    "new": "New Transaction",
+    "amount": "Amount",
+    "description": "Description",
+    "merchant": "Merchant",
+    "category": "Category",
+    "account": "Account",
+    "date": "Date",
+    "source": "Source",
+    "sources": {
+      "manual": "Manual",
+      "whatsapp": "WhatsApp",
+      "email": "Email",
+      "dtes": "DTE"
+    },
+    "confidence": "AI Confidence",
+    "verified": "Verified",
+    "needsReview": "Needs Review",
+    "noResults": "No transactions found"
+  },
+  "accounts": {
+    "title": "Accounts",
+    "new": "New Account",
+    "name": "Account Name",
+    "type": "Account Type",
+    "balance": "Balance",
+    "types": {
+      "checking": "Checking",
+      "savings": "Savings",
+      "credit": "Credit Card",
+      "cash": "Cash",
+      "investment": "Investment"
+    }
+  },
+  "categories": {
+    "title": "Categories",
+    "expense": "Expenses",
+    "income": "Income"
+  },
+  "whatsapp": {
+    "title": "WhatsApp Integration",
+    "status": "Connection Status",
+    "connected": "Connected",
+    "disconnected": "Not Connected",
+    "connect": "Connect WhatsApp",
+    "phoneNumber": "WhatsApp Number",
+    "simulator": {
+      "title": "Message Simulator",
+      "placeholder": "Paste a bank notification message here...",
+      "parse": "Parse Message",
+      "preview": "Parsed Transaction"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "language": "Language",
+    "languages": {
+      "en": "English",
+      "es": "Spanish"
+    },
+    "notifications": "Notifications",
+    "theme": "Theme"
+  },
+  "levels": {
+    "kook": {
+      "name": "Kook",
+      "description": "Just getting started! Log your first transactions."
+    },
+    "intermediate": {
+      "name": "Intermediate",
+      "description": "You're getting the hang of it! Keep tracking."
+    },
+    "performance": {
+      "name": "Performance",
+      "description": "Riding the waves of financial clarity!"
+    },
+    "pro": {
+      "name": "Pro",
+      "description": "You're a finance master! Shredding those expenses."
+    }
+  }
+}

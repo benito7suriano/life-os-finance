@@ -1,0 +1,166 @@
+{
+  "common": {
+    "appName": "Ledger",
+    "loading": "Cargando...",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "add": "Agregar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "all": "Todos",
+    "back": "Volver",
+    "next": "Siguiente",
+    "submit": "Enviar",
+    "success": "Éxito",
+    "error": "Error",
+    "currency": "USD"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "signup": "Registrarse",
+    "logout": "Cerrar Sesión",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "noAccount": "¿No tienes cuenta?",
+    "hasAccount": "¿Ya tienes cuenta?",
+    "loginSuccess": "¡Bienvenido de nuevo!",
+    "signupSuccess": "¡Cuenta creada! Por favor revisa tu correo para verificar.",
+    "loginError": "Correo o contraseña inválidos",
+    "signupError": "No se pudo crear la cuenta"
+  },
+  "landing": {
+    "hero": {
+      "title": "Domina tus Finanzas con IA",
+      "subtitle": "La forma inteligente de rastrear gastos en El Salvador. Conecta WhatsApp, escanea recibos y deja que la IA categorice tus gastos automáticamente.",
+      "cta": "Únete a la Lista de Espera",
+      "ctaSecondary": "Saber Más"
+    },
+    "features": {
+      "title": "Todo lo que Necesitas",
+      "whatsapp": {
+        "title": "Integración con WhatsApp",
+        "description": "Reenvía tus notificaciones bancarias y rastrearemos automáticamente tus transacciones."
+      },
+      "ai": {
+        "title": "Categorización con IA",
+        "description": "IA inteligente categoriza automáticamente tus gastos para que no tengas que hacerlo."
+      },
+      "insights": {
+        "title": "Análisis de Gastos",
+        "description": "Gráficos hermosos e informes para entender a dónde va tu dinero."
+      }
+    },
+    "waitlist": {
+      "title": "Sé el Primero en Saber",
+      "subtitle": "Únete a nuestra lista de espera y obtén acceso anticipado a Ledger.",
+      "namePlaceholder": "Tu nombre",
+      "emailPlaceholder": "tu@correo.com",
+      "referralPlaceholder": "¿Cómo te enteraste de nosotros?",
+      "success": "¡Estás en la lista! Te contactaremos pronto.",
+      "error": "Algo salió mal. Por favor intenta de nuevo."
+    }
+  },
+  "dashboard": {
+    "title": "Panel",
+    "welcome": "Bienvenido de nuevo",
+    "totalBalance": "Patrimonio neto",
+    "monthlySpending": "Gastos del Mes",
+    "monthlyIncome": "Ingresos del Mes",
+    "recentTransactions": "Transacciones Recientes",
+    "viewAll": "Ver Todo",
+    "quickActions": "Acciones Rápidas",
+    "addTransaction": "Agregar Transacción",
+    "connectWhatsApp": "Conectar WhatsApp",
+    "needsReview": "Necesita Revisión",
+    "noTransactions": "Aún no hay transacciones"
+  },
+  "transactions": {
+    "title": "Transacciones",
+    "new": "Nueva Transacción",
+    "amount": "Monto",
+    "description": "Descripción",
+    "merchant": "Comercio",
+    "category": "Categoría",
+    "account": "Cuenta",
+    "date": "Fecha",
+    "source": "Fuente",
+    "sources": {
+      "manual": "Manual",
+      "whatsapp": "WhatsApp",
+      "email": "Correo",
+      "dtes": "DTE"
+    },
+    "confidence": "Confianza IA",
+    "verified": "Verificado",
+    "needsReview": "Necesita Revisión",
+    "noResults": "No se encontraron transacciones"
+  },
+  "accounts": {
+    "title": "Cuentas",
+    "new": "Nueva Cuenta",
+    "name": "Nombre de Cuenta",
+    "type": "Tipo de Cuenta",
+    "balance": "Saldo",
+    "types": {
+      "checking": "Cuenta Corriente",
+      "savings": "Cuenta de Ahorro",
+      "credit": "Tarjeta de Crédito",
+      "cash": "Efectivo",
+      "investment": "Inversión"
+    }
+  },
+  "categories": {
+    "title": "Categorías",
+    "expense": "Gastos",
+    "income": "Ingresos"
+  },
+  "whatsapp": {
+    "title": "Integración WhatsApp",
+    "status": "Estado de Conexión",
+    "connected": "Conectado",
+    "disconnected": "No Conectado",
+    "connect": "Conectar WhatsApp",
+    "phoneNumber": "Número de WhatsApp",
+    "simulator": {
+      "title": "Simulador de Mensajes",
+      "placeholder": "Pega aquí un mensaje de notificación bancaria...",
+      "parse": "Analizar Mensaje",
+      "preview": "Transacción Detectada"
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "profile": "Perfil",
+    "language": "Idioma",
+    "languages": {
+      "en": "Inglés",
+      "es": "Español"
+    },
+    "notifications": "Notificaciones",
+    "theme": "Tema"
+  },
+  "levels": {
+    "kook": {
+      "name": "Kook",
+      "description": "¡Recién empezando! Registra tus primeras transacciones."
+    },
+    "intermediate": {
+      "name": "Intermedio",
+      "description": "¡Lo estás logrando! Sigue rastreando."
+    },
+    "performance": {
+      "name": "Performance",
+      "description": "¡Surfeando las olas de claridad financiera!"
+    },
+    "pro": {
+      "name": "Pro",
+      "description": "¡Eres un maestro de las finanzas! Dominando los gastos."
+    }
+  }
+}
