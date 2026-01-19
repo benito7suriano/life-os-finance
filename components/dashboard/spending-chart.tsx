@@ -193,41 +193,43 @@ export function SpendingChart({ transactions }: SpendingChartProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col items-center md:flex-row md:justify-center gap-6">
-          {/* Columna izquierda: Donut */}
-          <ChartContainer config={chartConfig} className="aspect-square h-[200px] flex-shrink-0">
-            <PieChart>
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null
-                  const data = payload[0].payload
-                  return (
-                    <div className="rounded-lg border bg-background px-3 py-2 shadow-md">
-                      <p className="font-medium">{chartConfig[data.name]?.label || data.name}</p>
-                      <p className="text-muted-foreground">{formatCurrency(data.value)}</p>
-                    </div>
-                  )
-                }}
-              />
-              <Pie
-                data={chartData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={80}
-                paddingAngle={2}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ChartContainer>
+        <div className="flex flex-col items-center md:flex-row md:justify-center gap-8">
+          {/* Columna izquierda: Donut alineado a la derecha */}
+          <div className="md:flex md:justify-end md:flex-1">
+            <ChartContainer config={chartConfig} className="aspect-square h-[200px] flex-shrink-0">
+              <PieChart>
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null
+                    const data = payload[0].payload
+                    return (
+                      <div className="rounded-lg border bg-background px-3 py-2 shadow-md">
+                        <p className="font-medium">{chartConfig[data.name]?.label || data.name}</p>
+                        <p className="text-muted-foreground">{formatCurrency(data.value)}</p>
+                      </div>
+                    )
+                  }}
+                />
+                <Pie
+                  data={chartData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={2}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ChartContainer>
+          </div>
 
           {/* Columna derecha: Total + Categorías */}
-          <div className="flex flex-col">
+          <div className="flex flex-col md:flex-1">
             <div className="text-center md:text-left">
               <p className="text-2xl font-bold">{formatCurrency(total)}</p>
               <p className="text-sm text-muted-foreground">Total gastado {filterLabels[activeFilter]}</p>
