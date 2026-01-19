@@ -155,7 +155,7 @@ export function AppSidebar({ user, profile }: AppSidebarProps) {
 
       </SidebarContent>
 
-      <SidebarFooter className="group-data-[collapsible=icon]:p-0">
+      <SidebarFooter className="group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2">
         <SidebarMenu>
           <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <DropdownMenu>
@@ -179,7 +179,7 @@ export function AppSidebar({ user, profile }: AppSidebarProps) {
               <DropdownMenuContent
                 className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
                 side="top"
-                align="end"
+                align="start"
                 sideOffset={4}
               >
                 <DropdownMenuItem asChild>
