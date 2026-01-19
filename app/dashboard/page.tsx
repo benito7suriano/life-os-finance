@@ -5,6 +5,7 @@ import { TrendChart } from "@/components/dashboard/monthly-trend-chart"
 import { RecentTransactions } from "@/components/dashboard/recent-transactions"
 import { QuickActions } from "@/components/dashboard/quick-actions"
 import { DashboardWelcome } from "@/components/dashboard/dashboard-welcome"
+import { calculateAccountBalances, type TransactionWithCategory, type AccountForBalance } from "@/lib/utils/balance"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -25,6 +26,7 @@ export default async function DashboardPage() {
     .from("transactions")
     .select(
       `
+      account_id,
       amount,
       category:categories(type)
     `,
@@ -52,16 +54,11 @@ export default async function DashboardPage() {
     .eq("user_id", user?.id)
     .eq("needs_review", true)
 
-  // Calculate real total balance from transactions (income - expenses)
-  const totalIncome =
-    allTransactions?.filter((t) => t.category?.type === "income").reduce((sum, t) => sum + Number(t.amount), 0) || 0
-
-  const totalExpenses =
-    allTransactions
-      ?.filter((t) => t.category?.type === "expense")
-      .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0) || 0
-
-  const totalBalance = totalIncome - totalExpenses
+  // Calculate real total balance using shared utility function
+  const { totalBalance } = calculateAccountBalances(
+    (accounts || []) as AccountForBalance[],
+    (allTransactions || []) as TransactionWithCategory[]
+  )
 
   // Calculate yesterday's balance for daily change
   const today = new Date()
@@ -76,6 +73,7 @@ export default async function DashboardPage() {
     .from("transactions")
     .select(
       `
+      account_id,
       amount,
       category:categories(type)
     `,
@@ -83,17 +81,11 @@ export default async function DashboardPage() {
     .eq("user_id", user?.id)
     .lt("transaction_date", todayStr)
 
-  const yesterdayIncome =
-    transactionsUntilYesterday
-      ?.filter((t) => t.category?.type === "income")
-      .reduce((sum, t) => sum + Number(t.amount), 0) || 0
-
-  const yesterdayExpenses =
-    transactionsUntilYesterday
-      ?.filter((t) => t.category?.type === "expense")
-      .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0) || 0
-
-  const yesterdayBalance = yesterdayIncome - yesterdayExpenses
+  // Calculate yesterday's balance using the same utility function
+  const { totalBalance: yesterdayBalance } = calculateAccountBalances(
+    (accounts || []) as AccountForBalance[],
+    (transactionsUntilYesterday || []) as TransactionWithCategory[]
+  )
   const dailyChange = totalBalance - yesterdayBalance
   const dailyChangePercent = yesterdayBalance !== 0 ? (dailyChange / Math.abs(yesterdayBalance)) * 100 : 0
 

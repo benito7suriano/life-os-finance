@@ -52,12 +52,13 @@ const accountTypeLabels: Record<string, string> = {
 
 interface AccountListProps {
   accounts: Account[]
+  accountBalances: Record<string, number>
   loading: boolean
   onEdit: (account: Account) => void
   onDelete: (accountId: string) => void
 }
 
-export function AccountList({ accounts, loading, onEdit, onDelete }: AccountListProps) {
+export function AccountList({ accounts, accountBalances, loading, onEdit, onDelete }: AccountListProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   if (loading) {
@@ -107,7 +108,7 @@ export function AccountList({ accounts, loading, onEdit, onDelete }: AccountList
         {accounts.map((account) => {
           const Icon = accountIcons[account.type] || Wallet
           const isCredit = account.type === "credit"
-          const balance = account.balance || 0
+          const balance = accountBalances[account.id] ?? account.balance ?? 0
 
           return (
             <Card key={account.id} className="overflow-hidden transition-shadow hover:shadow-md">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AccountList } from "@/components/accounts/account-list"
@@ -9,46 +9,72 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/database.types"
 import { toast } from "sonner"
+import { calculateAccountBalances, type TransactionWithCategory } from "@/lib/utils/balance"
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [transactions, setTransactions] = useState<TransactionWithCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
   const supabase = createClient()
 
-  const fetchAccounts = async () => {
+  const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data, error } = await supabase
-      .from("accounts")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
+    // Fetch accounts and transactions in parallel
+    const [accountsResult, transactionsResult] = await Promise.all([
+      supabase
+        .from("accounts")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("transactions")
+        .select(`
+          account_id,
+          amount,
+          category:categories(type)
+        `)
+        .eq("user_id", user.id)
+    ])
 
-    if (error) {
+    if (accountsResult.error) {
       toast.error("Error al cargar las cuentas")
-      console.error(error)
+      console.error(accountsResult.error)
     } else {
-      setAccounts(data || [])
+      setAccounts(accountsResult.data || [])
     }
+
+    if (transactionsResult.error) {
+      console.error("Error loading transactions:", transactionsResult.error)
+    } else {
+      setTransactions(transactionsResult.data as TransactionWithCategory[] || [])
+    }
+
     setLoading(false)
   }
 
   useEffect(() => {
-    fetchAccounts()
+    fetchData()
   }, [])
+
+  // Calculate balances using shared utility function
+  const { balancesByAccount: accountBalances, totalBalance } = useMemo(
+    () => calculateAccountBalances(accounts, transactions),
+    [accounts, transactions]
+  )
 
   const handleCreateSuccess = () => {
     setIsCreateOpen(false)
-    fetchAccounts()
+    fetchData()
     toast.success("Cuenta creada exitosamente")
   }
 
   const handleEditSuccess = () => {
     setEditingAccount(null)
-    fetchAccounts()
+    fetchData()
     toast.success("Cuenta actualizada exitosamente")
   }
 
@@ -62,18 +88,10 @@ export default function AccountsPage() {
       toast.error("Error al eliminar la cuenta")
       console.error(error)
     } else {
-      fetchAccounts()
+      fetchData()
       toast.success("Cuenta eliminada exitosamente")
     }
   }
-
-  // Calculate total balance
-  const totalBalance = accounts.reduce((sum, account) => {
-    if (account.type === "credit") {
-      return sum - (account.balance || 0)
-    }
-    return sum + (account.balance || 0)
-  }, 0)
 
   return (
     <div className="space-y-6">
@@ -114,6 +132,7 @@ export default function AccountsPage() {
       {/* Accounts List */}
       <AccountList
         accounts={accounts}
+        accountBalances={accountBalances}
         loading={loading}
         onEdit={setEditingAccount}
         onDelete={handleDelete}
