@@ -7,7 +7,7 @@ import { ChartContainer, type ChartConfig } from "@/components/ui/chart"
 import { formatCurrency, parseDateString } from "@/lib/utils/format"
 import { cn } from "@/lib/utils"
 
-type TimeFilter = "1d" | "1w" | "1m" | "1y" | "all"
+type TimeFilter = "d" | "s" | "m" | "a" | "t"
 
 interface Transaction {
   amount: number
@@ -26,62 +26,80 @@ interface SpendingChartProps {
 }
 
 const timeFilters: { label: string; value: TimeFilter }[] = [
-  { label: "1D", value: "1d" },
-  { label: "1W", value: "1w" },
-  { label: "1M", value: "1m" },
-  { label: "1Y", value: "1y" },
-  { label: "All", value: "all" },
+  { label: "D", value: "d" },
+  { label: "S", value: "s" },
+  { label: "M", value: "m" },
+  { label: "A", value: "a" },
+  { label: "T", value: "t" },
 ]
 
 const filterLabels: Record<TimeFilter, string> = {
-  "1d": "hoy",
-  "1w": "esta semana",
-  "1m": "este mes",
-  "1y": "este año",
-  "all": "en total",
+  "d": "hoy",
+  "s": "esta semana",
+  "m": "este mes",
+  "a": "este año",
+  "t": "en total",
 }
 
-function getDateThreshold(filter: TimeFilter): Date | null {
+function getStartOfWeek(date: Date): Date {
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1) // Adjust when day is Sunday
+  d.setDate(diff)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function getDateRange(filter: TimeFilter): { start: Date; end: Date } | null {
   const now = new Date()
-  now.setHours(23, 59, 59, 999)
 
   switch (filter) {
-    case "1d":
-      const today = new Date(now)
-      today.setHours(0, 0, 0, 0)
-      return today
-    case "1w":
-      const weekAgo = new Date(now)
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      weekAgo.setHours(0, 0, 0, 0)
-      return weekAgo
-    case "1m":
-      const monthAgo = new Date(now)
-      monthAgo.setMonth(monthAgo.getMonth() - 1)
-      monthAgo.setHours(0, 0, 0, 0)
-      return monthAgo
-    case "1y":
-      const yearAgo = new Date(now)
-      yearAgo.setFullYear(yearAgo.getFullYear() - 1)
-      yearAgo.setHours(0, 0, 0, 0)
-      return yearAgo
-    case "all":
+    case "d":
+      // Current day: today 00:00 to today 23:59
+      const todayStart = new Date(now)
+      todayStart.setHours(0, 0, 0, 0)
+      const todayEnd = new Date(now)
+      todayEnd.setHours(23, 59, 59, 999)
+      return { start: todayStart, end: todayEnd }
+    case "s":
+      // Current week: Monday 00:00 to Sunday 23:59
+      const weekStart = getStartOfWeek(now)
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekEnd.getDate() + 6)
+      weekEnd.setHours(23, 59, 59, 999)
+      return { start: weekStart, end: weekEnd }
+    case "m":
+      // Current month: 1st day 00:00 to last day 23:59
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      monthStart.setHours(0, 0, 0, 0)
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      monthEnd.setHours(23, 59, 59, 999)
+      return { start: monthStart, end: monthEnd }
+    case "a":
+      // Current year: Jan 1 00:00 to Dec 31 23:59
+      const yearStart = new Date(now.getFullYear(), 0, 1)
+      yearStart.setHours(0, 0, 0, 0)
+      const yearEnd = new Date(now.getFullYear(), 11, 31)
+      yearEnd.setHours(23, 59, 59, 999)
+      return { start: yearStart, end: yearEnd }
+    case "t":
+      // All transactions
       return null
   }
 }
 
 export function SpendingChart({ transactions }: SpendingChartProps) {
-  const [activeFilter, setActiveFilter] = useState<TimeFilter>("1m")
+  const [activeFilter, setActiveFilter] = useState<TimeFilter>("m")
 
   const { data, total } = useMemo(() => {
-    const threshold = getDateThreshold(activeFilter)
+    const range = getDateRange(activeFilter)
 
     // Filter transactions by date and type (expenses only)
     const filtered = transactions.filter((t) => {
       if (t.category?.type !== "expense") return false
-      if (!threshold) return true
+      if (!range) return true
       const txDate = parseDateString(t.transaction_date)
-      return txDate >= threshold
+      return txDate >= range.start && txDate <= range.end
     })
 
     // Group by category
