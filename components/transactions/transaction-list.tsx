@@ -59,9 +59,9 @@ export function TransactionList({
     const { error } = await supabase.from("transactions").delete().eq("id", deleteId)
 
     if (error) {
-      toast.error("Error al eliminar la transaccion")
+      toast.error("Error al eliminar la transacción")
     } else {
-      toast.success("Transaccion eliminada")
+      toast.success("Transacción eliminada")
       router.refresh()
     }
 
@@ -96,10 +96,10 @@ export function TransactionList({
         </div>
         <h3 className="mt-4 text-lg font-semibold">No hay transacciones</h3>
         <p className="mt-2 text-sm text-muted-foreground">
-          Comienza agregando tu primera transaccion o conecta WhatsApp para importar automaticamente.
+          Comienza agregando tu primera transacción o conecta WhatsApp para importar automáticamente.
         </p>
         <Button className="mt-4" onClick={() => router.push("/dashboard/transactions/new")}>
-          Agregar transaccion
+          Agregar transacción
         </Button>
       </div>
     )
@@ -112,8 +112,8 @@ export function TransactionList({
           <TableHeader>
             <TableRow>
               <TableHead>Fecha</TableHead>
-              <TableHead>Descripcion</TableHead>
-              <TableHead>Categoria</TableHead>
+              <TableHead>Descripción</TableHead>
+              <TableHead>Categoría</TableHead>
               <TableHead>Cuenta</TableHead>
               <TableHead className="text-right">Monto</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -130,14 +130,14 @@ export function TransactionList({
                     {getSourceIcon(transaction.source)}
                     <div>
                       <p className="font-medium">
-                        {transaction.merchant_name || transaction.description || "Sin descripcion"}
+                        {transaction.merchant_name || transaction.description || "Sin descripción"}
                       </p>
                       {transaction.merchant_name && transaction.description && (
                         <p className="text-sm text-muted-foreground">{transaction.description}</p>
                       )}
                     </div>
                     {transaction.needs_review && (
-                      <AlertCircle className="size-4 text-amber-500" title="Necesita revision" />
+                      <AlertCircle className="size-4 text-amber-500" title="Necesita revisión" />
                     )}
                   </div>
                 </TableCell>
@@ -154,7 +154,7 @@ export function TransactionList({
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-muted-foreground">
-                      Sin categoria
+                      Sin categoría
                     </Badge>
                   )}
                   {transaction.ai_confidence !== null && transaction.ai_confidence < 0.7 && (
@@ -224,7 +224,7 @@ export function TransactionList({
             Anterior
           </Button>
           <span className="text-sm">
-            Pagina {currentPage} de {totalPages || 1}
+            Página {currentPage} de {totalPages || 1}
           </span>
           <Button
             variant="outline"
@@ -242,9 +242,9 @@ export function TransactionList({
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar transaccion</AlertDialogTitle>
+            <AlertDialogTitle>Eliminar transacción</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion no se puede deshacer. La transaccion sera eliminada permanentemente.
+              Esta acción no se puede deshacer. La transacción será eliminada permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

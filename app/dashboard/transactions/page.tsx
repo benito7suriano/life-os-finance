@@ -88,7 +88,7 @@ export default async function TransactionsPage({
         <Button asChild>
           <Link href="/dashboard/transactions/new">
             <Plus className="mr-2 size-4" />
-            Nueva Transaccion
+            Nueva Transacción
           </Link>
         </Button>
       </div>

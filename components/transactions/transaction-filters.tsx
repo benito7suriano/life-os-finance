@@ -99,7 +99,7 @@ export function TransactionFilters({
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por descripcion o comercio..."
+            placeholder="Buscar por descripción o comercio..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
@@ -112,10 +112,10 @@ export function TransactionFilters({
             onValueChange={(v) => updateFilter("category", v === "all" ? "" : v)}
           >
             <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Categoria" />
+              <SelectValue placeholder="Categoría" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas las categorias</SelectItem>
+              <SelectItem value="all">Todas las categorías</SelectItem>
               {categories.map((cat) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   {cat.name_es}

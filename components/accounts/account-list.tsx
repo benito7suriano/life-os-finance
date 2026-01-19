@@ -177,8 +177,8 @@ export function AccountList({ accounts, accountBalances, loading, onEdit, onDele
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar cuenta</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion eliminara la cuenta y todas sus transacciones asociadas.
-              Esta accion no se puede deshacer.
+              Esta acción eliminará la cuenta y todas sus transacciones asociadas.
+              Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

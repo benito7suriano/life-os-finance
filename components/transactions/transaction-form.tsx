@@ -76,7 +76,7 @@ export function TransactionForm({
 
   const handleAICategorize = async () => {
     if (!merchantName && !description) {
-      toast.error("Ingresa un comercio o descripcion para categorizar")
+      toast.error("Ingresa un comercio o descripción para categorizar")
       return
     }
 
@@ -115,9 +115,9 @@ export function TransactionForm({
     if (suggestedCategory) {
       setCategoryId(suggestedCategory.id)
       setAiConfidence(confidence)
-      toast.success(`Categoria sugerida: ${suggestedCategory.name_es} (${Math.round(confidence * 100)}% confianza)`)
+      toast.success(`Categoría sugerida: ${suggestedCategory.name_es} (${Math.round(confidence * 100)}% confianza)`)
     } else {
-      toast.info("No se pudo determinar una categoria automaticamente")
+      toast.info("No se pudo determinar una categoría automáticamente")
     }
 
     setIsCategorizing(false)
@@ -161,10 +161,10 @@ export function TransactionForm({
     }
 
     if (error) {
-      toast.error(isEditing ? "Error al actualizar la transaccion" : "Error al crear la transaccion")
+      toast.error(isEditing ? "Error al actualizar la transacción" : "Error al crear la transacción")
       console.error(error)
     } else {
-      toast.success(isEditing ? "Transaccion actualizada" : "Transaccion creada")
+      toast.success(isEditing ? "Transacción actualizada" : "Transacción creada")
       router.push("/dashboard/transactions")
       router.refresh()
     }
@@ -178,7 +178,7 @@ export function TransactionForm({
         <CardContent className="pt-6 space-y-6">
           {/* Transaction Type Toggle */}
           <div className="space-y-2">
-            <Label>Tipo de transaccion</Label>
+            <Label>Tipo de transacción</Label>
             <Tabs
               value={transactionType}
               onValueChange={(v) => {
@@ -231,7 +231,7 @@ export function TransactionForm({
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Descripcion</Label>
+            <Label htmlFor="description">Descripción</Label>
             <Textarea
               id="description"
               placeholder="Detalles adicionales..."
@@ -244,7 +244,7 @@ export function TransactionForm({
           {/* Category with AI suggestion */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="category">Categoria</Label>
+              <Label htmlFor="category">Categoría</Label>
               <Button
                 type="button"
                 variant="ghost"
@@ -262,7 +262,7 @@ export function TransactionForm({
             </div>
             <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona una categoria" />
+                <SelectValue placeholder="Selecciona una categoría" />
               </SelectTrigger>
               <SelectContent>
                 {filteredCategories.map((category) => (
@@ -281,7 +281,7 @@ export function TransactionForm({
             {aiConfidence !== null && (
               <p className="text-xs text-muted-foreground">
                 Confianza de IA: {Math.round(aiConfidence * 100)}%
-                {aiConfidence < 0.7 && " (requiere revision)"}
+                {aiConfidence < 0.7 && " (requiere revisión)"}
               </p>
             )}
           </div>
@@ -347,7 +347,7 @@ export function TransactionForm({
                   {isEditing ? "Guardando..." : "Creando..."}
                 </>
               ) : (
-                isEditing ? "Guardar cambios" : "Crear transaccion"
+                isEditing ? "Guardar cambios" : "Crear transacción"
               )}
             </Button>
           </div>
