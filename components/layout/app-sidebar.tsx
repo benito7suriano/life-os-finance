@@ -91,8 +91,8 @@ export function AppSidebar({ user, profile }: AppSidebarProps) {
 
   return (
     <Sidebar variant="inset" collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center justify-between px-2 py-2">
+      <SidebarHeader className="border-b border-sidebar-border group-data-[collapsible=icon]:p-0">
+        <div className="flex items-center justify-between px-2 py-2 w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           {isCollapsed ? (
             <Button
               variant="ghost"
@@ -130,15 +130,20 @@ export function AppSidebar({ user, profile }: AppSidebarProps) {
 
       <SidebarContent>
         {/* Main Navigation */}
-        <SidebarGroup>
+        <SidebarGroup className="group-data-[collapsible=icon]:p-2">
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.title}>
-                    <Link href={item.href}>
+                <SidebarMenuItem key={item.href} className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === item.href} 
+                    tooltip={item.title} 
+                    className="group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!w-8 group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center"
+                  >
+                    <Link href={item.href} className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:h-full">
                       <item.icon className="size-4" />
-                      <span>{item.title}</span>
+                      <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -150,25 +155,25 @@ export function AppSidebar({ user, profile }: AppSidebarProps) {
 
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="group-data-[collapsible=icon]:p-0">
         <SidebarMenu>
-          <SidebarMenuItem>
+          <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:!w-8 group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center"
                 >
                   <Avatar className="size-8">
                     <AvatarFallback className="bg-[#0f4c81] text-white text-xs">{initials}</AvatarFallback>
                   </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
+                  <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                     <span className="truncate font-semibold">
                       {profile?.first_name ? `${profile.first_name} ${profile.last_name || ""}`.trim() : user.email}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">{user.email}</span>
                   </div>
-                  <ChevronUp className="ml-auto size-4" />
+                  <ChevronUp className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
