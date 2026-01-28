@@ -1,0 +1,150 @@
+{
+  "categories": [
+    { "id": "cat-001", "name": "Salary", "color": "emerald", "type": "income" },
+    { "id": "cat-002", "name": "Freelance", "color": "teal", "type": "income" },
+    { "id": "cat-003", "name": "Groceries", "color": "amber", "type": "expense" },
+    { "id": "cat-004", "name": "Dining Out", "color": "orange", "type": "expense" },
+    { "id": "cat-005", "name": "Transportation", "color": "sky", "type": "expense" },
+    { "id": "cat-006", "name": "Utilities", "color": "violet", "type": "expense" },
+    { "id": "cat-007", "name": "Entertainment", "color": "pink", "type": "expense" },
+    { "id": "cat-008", "name": "Shopping", "color": "rose", "type": "expense" },
+    { "id": "cat-009", "name": "Health", "color": "red", "type": "expense" },
+    { "id": "cat-010", "name": "Subscriptions", "color": "indigo", "type": "expense" }
+  ],
+  "accounts": [
+    { "id": "acc-001", "name": "Main Checking", "type": "checking", "icon": "building-columns" },
+    { "id": "acc-002", "name": "Savings", "type": "savings", "icon": "piggy-bank" },
+    { "id": "acc-003", "name": "Visa Credit Card", "type": "credit_card", "icon": "credit-card" },
+    { "id": "acc-004", "name": "Cash Wallet", "type": "wallet", "icon": "wallet" }
+  ],
+  "transactions": [
+    {
+      "id": "txn-001",
+      "date": "2026-01-22",
+      "description": "Monthly salary deposit",
+      "categoryId": "cat-001",
+      "accountId": "acc-001",
+      "amount": 4500.00,
+      "type": "income",
+      "source": "manual"
+    },
+    {
+      "id": "txn-002",
+      "date": "2026-01-21",
+      "description": "Super Selectos groceries",
+      "categoryId": "cat-003",
+      "accountId": "acc-003",
+      "amount": -87.45,
+      "type": "expense",
+      "source": "whatsapp"
+    },
+    {
+      "id": "txn-003",
+      "date": "2026-01-20",
+      "description": "Uber ride to downtown",
+      "categoryId": "cat-005",
+      "accountId": "acc-003",
+      "amount": -12.50,
+      "type": "expense",
+      "source": "email"
+    },
+    {
+      "id": "txn-004",
+      "date": "2026-01-19",
+      "description": "Netflix subscription",
+      "categoryId": "cat-010",
+      "accountId": "acc-003",
+      "amount": -15.99,
+      "type": "expense",
+      "source": "email"
+    },
+    {
+      "id": "txn-005",
+      "date": "2026-01-18",
+      "description": "Dinner at La Pampa Grill",
+      "categoryId": "cat-004",
+      "accountId": "acc-003",
+      "amount": -156.80,
+      "type": "expense",
+      "source": "whatsapp"
+    },
+    {
+      "id": "txn-006",
+      "date": "2026-01-15",
+      "description": "Freelance project payment",
+      "categoryId": "cat-002",
+      "accountId": "acc-001",
+      "amount": 350.00,
+      "type": "income",
+      "source": "manual"
+    },
+    {
+      "id": "txn-007",
+      "date": "2026-01-14",
+      "description": "Electricity bill",
+      "categoryId": "cat-006",
+      "accountId": "acc-001",
+      "amount": -78.32,
+      "type": "expense",
+      "source": "email"
+    },
+    {
+      "id": "txn-008",
+      "date": "2026-01-12",
+      "description": "Coffee at Viva Espresso",
+      "categoryId": "cat-004",
+      "accountId": "acc-004",
+      "amount": -8.75,
+      "type": "expense",
+      "source": "manual"
+    },
+    {
+      "id": "txn-009",
+      "date": "2026-01-10",
+      "description": "Amazon - Wireless headphones",
+      "categoryId": "cat-008",
+      "accountId": "acc-003",
+      "amount": -89.99,
+      "type": "expense",
+      "source": "email"
+    },
+    {
+      "id": "txn-010",
+      "date": "2026-01-08",
+      "description": "Gas station fill-up",
+      "categoryId": "cat-005",
+      "accountId": "acc-003",
+      "amount": -45.00,
+      "type": "expense",
+      "source": "whatsapp"
+    }
+  ],
+  "summary": {
+    "count": 15,
+    "totalIncome": 9350.00,
+    "totalExpenses": 794.33
+  },
+  "goalsByAccount": [
+    {
+      "accountId": "acc-002",
+      "goals": [
+        {
+          "id": "goal-001",
+          "name": "Emergency Fund",
+          "currentBalance": 2500,
+          "targetAmount": 5000,
+          "targetDate": "2026-12-31",
+          "monthlyContribution": 250
+        },
+        {
+          "id": "goal-002",
+          "name": "Vacation Fund",
+          "currentBalance": 800,
+          "targetAmount": 2000,
+          "targetDate": "2026-06-30",
+          "monthlyContribution": 200
+        }
+      ]
+    }
+  ]
+}

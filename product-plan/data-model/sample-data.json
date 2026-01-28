@@ -1,0 +1,30 @@
+{
+  "user": {
+    "id": "user-001",
+    "firstName": "Beno",
+    "lastName": "Suriano",
+    "email": "benosuriano@example.com",
+    "preferredLanguage": "en",
+    "subscriptionTier": "pro"
+  },
+  "institutions": [
+    { "id": "inst-001", "name": "Banco Agricola", "country": "SV" },
+    { "id": "inst-002", "name": "Banco Cuscatlan", "country": "SV" },
+    { "id": "inst-003", "name": "BAC Credomatic", "country": "SV" }
+  ],
+  "creditCardProviders": [
+    { "id": "cc-001", "name": "Visa", "icon": "visa" },
+    { "id": "cc-002", "name": "Mastercard", "icon": "mastercard" },
+    { "id": "cc-003", "name": "American Express", "icon": "amex" }
+  ],
+  "categories": [
+    { "id": "cat-food", "name": "Food & Dining", "color": "#f97316", "icon": "utensils", "type": "expense" },
+    { "id": "cat-transport", "name": "Auto & Transportation", "color": "#3b82f6", "icon": "car", "type": "expense" },
+    { "id": "cat-housing", "name": "Housing", "color": "#8b5cf6", "icon": "home", "type": "expense" },
+    { "id": "cat-utilities", "name": "Bills & Utilities", "color": "#ec4899", "icon": "zap", "type": "expense" },
+    { "id": "cat-shopping", "name": "Shopping", "color": "#14b8a6", "icon": "shopping-bag", "type": "expense" },
+    { "id": "cat-health", "name": "Health & Wellness", "color": "#ef4444", "icon": "heart", "type": "expense" },
+    { "id": "cat-entertainment", "name": "Travel & Lifestyle", "color": "#f59e0b", "icon": "plane", "type": "expense" },
+    { "id": "cat-salary", "name": "Income", "color": "#10b981", "icon": "dollar-sign", "type": "income" }
+  ]
+}
