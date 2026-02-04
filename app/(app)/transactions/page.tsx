@@ -67,11 +67,12 @@ export default function TransactionsPage() {
         setCategories(dbCategories as Category[])
       }
 
-      // Load accounts
+      // Load accounts (exclude soft-deleted)
       const { data: dbAccounts } = await supabase
         .from('accounts')
         .select('id, name, type, icon')
         .eq('user_id', user.id)
+        .is('deleted_at', null)
         .order('name')
       if (dbAccounts && dbAccounts.length > 0) {
         setAccounts(dbAccounts as Account[])
