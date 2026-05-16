@@ -1,0 +1,21 @@
+/* Design Tokens for Ledger */
+
+:root {
+  /* Colors - Using Tailwind's built-in color scales */
+  --color-primary: theme('colors.emerald');
+  --color-secondary: theme('colors.amber');
+  --color-neutral: theme('colors.slate');
+
+  /* Typography */
+  --font-heading: 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Note: These CSS custom properties reference Tailwind's theme.
+   In your actual implementation, use Tailwind utility classes directly:
+
+   Primary:   bg-emerald-600, text-emerald-500, border-emerald-400, etc.
+   Secondary: bg-amber-600, text-amber-500, border-amber-400, etc.
+   Neutral:   bg-slate-100, text-slate-900, border-slate-200, etc.
+*/
