@@ -3,6 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { BudgetsDashboard } from '@/components/budgets'
 import { createClient } from '@/lib/supabase/client'
+import {
+  listBudgets,
+  createBudget,
+  updateBudget,
+  deleteBudget,
+  updateGoal,
+} from '@/lib/api/client'
 import sampleData from '@/components/budgets/sample-data.json'
 import type {
   Budget,
@@ -39,27 +46,21 @@ export default function BudgetsPage() {
   // Fetch all budget data from the API
   const fetchBudgets = useCallback(async () => {
     try {
-      const res = await fetch('/api/budgets')
-      if (!res.ok) return
+      const data = await listBudgets()
 
-      const data = await res.json()
-
-      // If we got data back, use it
       if (data.budgets && (data.budgets.length > 0 || data.goals?.length > 0)) {
-        setBudgets(data.budgets)
-        setGoals(data.goals || [])
-        setGoalContributions(data.goalContributions || [])
-        setCategories(data.categories || sampleCategories)
-        setSavingsAccounts(data.savingsAccounts || [])
-        setSummary(data.summary)
-        setMonthlyHistory(data.monthlyHistory || [])
-        setTransactions(data.transactions || [])
+        setBudgets(data.budgets as Budget[])
+        setGoals((data.goals || []) as Goal[])
+        setGoalContributions((data.goalContributions || []) as GoalContribution[])
+        setCategories((data.categories || sampleCategories) as Category[])
+        setSavingsAccounts((data.savingsAccounts || []) as SavingsAccountOption[])
+        setSummary(data.summary as BudgetSummary)
+        setMonthlyHistory((data.monthlyHistory || []) as MonthlyHistoryEntry[])
+        setTransactions((data.transactions || []) as Transaction[])
       } else {
-        // No data from API, fall back to sample data
         setUseApi(false)
       }
     } catch {
-      // API not available, keep using sample data
       setUseApi(false)
     }
   }, [])
@@ -89,15 +90,11 @@ export default function BudgetsPage() {
     async (budget: Omit<Budget, 'id' | 'spent' | 'linkedGoalId'>) => {
       if (useApi) {
         try {
-          await fetch('/api/budgets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'monthly',
-              categoryId: budget.categoryId,
-              subcategoryId: budget.subcategoryId,
-              amount: budget.budgeted,
-            }),
+          await createBudget({
+            type: 'monthly',
+            categoryId: budget.categoryId,
+            subcategoryId: budget.subcategoryId,
+            amount: budget.budgeted,
           })
           await fetchBudgets()
         } catch {
@@ -130,18 +127,14 @@ export default function BudgetsPage() {
     }) => {
       if (useApi) {
         try {
-          await fetch('/api/budgets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'sinking_fund',
-              categoryId: data.categoryId,
-              subcategoryId: data.subcategoryId,
-              name: data.name,
-              targetAmount: data.targetAmount,
-              targetDate: data.targetDate,
-              linkedAccountId: data.linkedAccountId,
-            }),
+          await createBudget({
+            type: 'sinking_fund',
+            categoryId: data.categoryId,
+            subcategoryId: data.subcategoryId,
+            name: data.name,
+            targetAmount: data.targetAmount,
+            targetDate: data.targetDate,
+            linkedAccountId: data.linkedAccountId,
           })
           await fetchBudgets()
         } catch {
@@ -197,11 +190,7 @@ export default function BudgetsPage() {
     async (id: string, updates: Partial<Budget>) => {
       if (useApi) {
         try {
-          await fetch(`/api/budgets/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: updates.budgeted }),
-          })
+          await updateBudget(id, { amount: updates.budgeted })
           await fetchBudgets()
         } catch {
           // Ignore
@@ -219,7 +208,7 @@ export default function BudgetsPage() {
     async (id: string) => {
       if (useApi) {
         try {
-          await fetch(`/api/budgets/${id}`, { method: 'DELETE' })
+          await deleteBudget(id)
           await fetchBudgets()
         } catch {
           // Ignore
@@ -246,13 +235,9 @@ export default function BudgetsPage() {
     async (id: string, updates: Partial<Goal>) => {
       if (useApi) {
         try {
-          await fetch(`/api/goals/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              targetAmount: updates.targetAmount,
-              targetDate: updates.targetDate,
-            }),
+          await updateGoal(id, {
+            targetAmount: updates.targetAmount,
+            targetDate: updates.targetDate,
           })
           await fetchBudgets()
         } catch {
@@ -271,11 +256,7 @@ export default function BudgetsPage() {
     async (id: string) => {
       if (useApi) {
         try {
-          await fetch(`/api/goals/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'archived' }),
-          })
+          await updateGoal(id, { status: 'archived' })
           await fetchBudgets()
         } catch {
           // Ignore

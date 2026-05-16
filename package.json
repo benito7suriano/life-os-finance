@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "db:types": "supabase gen types typescript --project-id ibtcggqdlljrjeaqfwfw --schema public,finance > lib/supabase/database.types.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function createClient() {
+async function buildClient(schema?: 'finance') {
   const cookieStore = await cookies()
 
   return createServerClient(
@@ -23,6 +23,20 @@ export async function createClient() {
           }
         },
       },
+      ...(schema ? { db: { schema } } : {}),
     }
   )
+}
+
+// Default client — queries resolve against the `public` schema.
+// Use for auth-only flows or to access shared tables like `public.users`.
+export async function createClient() {
+  return buildClient()
+}
+
+// Finance-scoped client — `.from('transactions')` resolves to
+// `finance.transactions`. Auth methods continue to work normally.
+// Use inside `/app/api/finance/*` route handlers.
+export async function createFinanceClient() {
+  return buildClient('finance')
 }

@@ -3,6 +3,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { AccountsView, UndoToast } from '@/components/accounts'
 import { createClient } from '@/lib/supabase/client'
+import {
+  listAccounts,
+  createAccount,
+  updateAccount,
+  deleteAccount,
+  restoreAccount,
+  listInstitutions,
+  listCreditCardProviders,
+} from '@/lib/api/client'
 import sampleData from '@/components/accounts/sample-data.json'
 import type {
   Account,
@@ -40,22 +49,19 @@ export default function AccountsPage() {
 
       setUseApi(true)
 
-      // Load institutions
-      const { data: dbInstitutions } = await supabase
-        .from('institutions')
-        .select('id, name')
-        .order('name')
-      if (dbInstitutions && dbInstitutions.length > 0) {
-        setInstitutions(dbInstitutions)
-      }
-
-      // Load credit card providers
-      const { data: dbProviders } = await supabase
-        .from('credit_card_providers')
-        .select('id, name, icon')
-        .order('name')
-      if (dbProviders && dbProviders.length > 0) {
-        setCreditCardProviders(dbProviders)
+      try {
+        const [{ institutions: dbInstitutions }, { providers: dbProviders }] = await Promise.all([
+          listInstitutions(),
+          listCreditCardProviders(),
+        ])
+        if (dbInstitutions && dbInstitutions.length > 0) {
+          setInstitutions(dbInstitutions as Institution[])
+        }
+        if (dbProviders && dbProviders.length > 0) {
+          setCreditCardProviders(dbProviders as CreditCardProvider[])
+        }
+      } catch {
+        // API not available — keep sample data
       }
     }
     loadReferenceData()
@@ -66,15 +72,9 @@ export default function AccountsPage() {
     if (!useApi) return
 
     try {
-      const params = new URLSearchParams()
-      if (showArchived) params.set('archived', 'true')
-
-      const res = await fetch(`/api/accounts?${params.toString()}`)
-      if (!res.ok) return
-
-      const data = await res.json()
+      const data = await listAccounts({ archived: showArchived })
       if (data.accounts && data.accounts.length > 0) {
-        setAccounts(data.accounts)
+        setAccounts(data.accounts as Account[])
       } else if (!showArchived) {
         // If no active accounts from API, fall back to sample data
         setUseApi(false)
@@ -101,17 +101,9 @@ export default function AccountsPage() {
       if (useApi) {
         try {
           if (data.id) {
-            await fetch(`/api/accounts/${data.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(data),
-            })
+            await updateAccount(data.id, data as Record<string, unknown>)
           } else {
-            await fetch('/api/accounts', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(data),
-            })
+            await createAccount(data as Record<string, unknown>)
           }
           await fetchAccounts()
         } catch {
@@ -143,7 +135,7 @@ export default function AccountsPage() {
 
       if (useApi) {
         try {
-          await fetch(`/api/accounts/${id}`, { method: 'DELETE' })
+          await deleteAccount(id)
           setDeletedAccount({ id, name: account.name })
           setDeletedBackup(null)
           await fetchAccounts()
@@ -164,7 +156,7 @@ export default function AccountsPage() {
     async (id: string) => {
       if (useApi) {
         try {
-          await fetch(`/api/accounts/${id}/restore`, { method: 'PATCH' })
+          await restoreAccount(id)
           setDeletedAccount(null)
           setDeletedBackup(null)
           await fetchAccounts()

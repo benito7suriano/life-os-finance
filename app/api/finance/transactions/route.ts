@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createFinanceClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
+  const supabase = await createFinanceClient()
 
   const {
     data: { user },
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
+  const supabase = await createFinanceClient()
 
   const {
     data: { user },
@@ -176,6 +176,7 @@ export async function POST(request: NextRequest) {
     description,
     amount,
     source: 'manual',
+    source_app: 'financial-ledger',
   }
 
   if (type === 'expense') {

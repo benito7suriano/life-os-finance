@@ -3,6 +3,15 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { TransactionList, TransactionModal, DeleteConfirmDialog } from '@/components/transactions'
 import { createClient } from '@/lib/supabase/client'
+import {
+  listTransactions,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
+  listCategories,
+  listAccounts,
+  listGoals,
+} from '@/lib/api/client'
 import sampleData from '@/components/transactions/sample-data.json'
 import type {
   Transaction,
@@ -58,62 +67,58 @@ export default function TransactionsPage() {
 
       setUseApi(true)
 
-      // Load categories
-      const { data: dbCategories } = await supabase
-        .from('categories')
-        .select('id, name, color, type')
-        .order('name')
-      if (dbCategories && dbCategories.length > 0) {
-        setCategories(dbCategories as Category[])
-      }
+      try {
+        const [{ categories: dbCategories }, { accounts: dbAccounts }, { goals: dbGoals }] =
+          await Promise.all([listCategories(), listAccounts(), listGoals()])
 
-      // Load accounts (exclude soft-deleted)
-      const { data: dbAccounts } = await supabase
-        .from('accounts')
-        .select('id, name, type, icon')
-        .eq('user_id', user.id)
-        .is('deleted_at', null)
-        .order('name')
-      if (dbAccounts && dbAccounts.length > 0) {
-        setAccounts(dbAccounts as Account[])
-      }
-
-      // Load goals grouped by savings account
-      const { data: dbGoals } = await supabase
-        .from('goals')
-        .select('id, name, current_balance, target_amount, target_date, linked_account_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-
-      if (dbGoals && dbGoals.length > 0) {
-        const grouped: Record<string, GoalSummary[]> = {}
-        for (const goal of dbGoals) {
-          const accountId = goal.linked_account_id
-          if (!grouped[accountId]) grouped[accountId] = []
-          // Estimate monthly contribution from remaining amount and time
-          const remaining = Number(goal.target_amount) - Number(goal.current_balance)
-          const targetDate = new Date(goal.target_date)
-          const now = new Date()
-          const monthsLeft = Math.max(
-            1,
-            (targetDate.getFullYear() - now.getFullYear()) * 12 +
-              (targetDate.getMonth() - now.getMonth())
-          )
-          grouped[accountId].push({
-            id: goal.id,
-            name: goal.name,
-            currentBalance: Number(goal.current_balance),
-            targetAmount: Number(goal.target_amount),
-            targetDate: goal.target_date,
-            monthlyContribution: Math.round((remaining / monthsLeft) * 100) / 100,
-          })
+        if (dbCategories && dbCategories.length > 0) {
+          setCategories(dbCategories as Category[])
         }
-        setGoalsByAccount(
-          Object.entries(grouped).map(([accountId, goals]) => ({
-            accountId,
-            goals,
-          }))
-        )
+        if (dbAccounts && dbAccounts.length > 0) {
+          setAccounts(dbAccounts as Account[])
+        }
+
+        const activeGoals = ((dbGoals ?? []) as Array<{
+          id: string
+          name: string
+          currentBalance: number
+          targetAmount: number
+          targetDate: string
+          linkedAccountId: string
+          status: string
+        }>).filter((g) => g.status === 'active')
+
+        if (activeGoals.length > 0) {
+          const grouped: Record<string, GoalSummary[]> = {}
+          for (const goal of activeGoals) {
+            const accountId = goal.linkedAccountId
+            if (!grouped[accountId]) grouped[accountId] = []
+            const remaining = goal.targetAmount - goal.currentBalance
+            const targetDate = new Date(goal.targetDate)
+            const now = new Date()
+            const monthsLeft = Math.max(
+              1,
+              (targetDate.getFullYear() - now.getFullYear()) * 12 +
+                (targetDate.getMonth() - now.getMonth())
+            )
+            grouped[accountId].push({
+              id: goal.id,
+              name: goal.name,
+              currentBalance: goal.currentBalance,
+              targetAmount: goal.targetAmount,
+              targetDate: goal.targetDate,
+              monthlyContribution: Math.round((remaining / monthsLeft) * 100) / 100,
+            })
+          }
+          setGoalsByAccount(
+            Object.entries(grouped).map(([accountId, goals]) => ({
+              accountId,
+              goals,
+            }))
+          )
+        }
+      } catch {
+        // API not available — keep sample data
       }
     }
 
@@ -124,25 +129,21 @@ export default function TransactionsPage() {
   const fetchTransactions = useCallback(async () => {
     if (!useApi) return
 
-    const params = new URLSearchParams()
-    if (searchQuery) params.set('search', searchQuery)
-    if (filters.categoryIds?.length) params.set('categoryIds', filters.categoryIds.join(','))
-    if (filters.accountIds?.length) params.set('accountIds', filters.accountIds.join(','))
-    if (filters.sources?.length) params.set('sources', filters.sources.join(','))
-    if (filters.dateRange?.start) params.set('dateFrom', filters.dateRange.start)
-    if (filters.dateRange?.end) params.set('dateTo', filters.dateRange.end)
-    params.set('sortBy', sortField)
-    params.set('sortDir', sortDirection)
-    params.set('page', String(currentPage))
-    params.set('limit', String(ITEMS_PER_PAGE))
-
     try {
-      const res = await fetch(`/api/transactions?${params.toString()}`)
-      if (!res.ok) return
-
-      const data = await res.json()
+      const data = await listTransactions({
+        search: searchQuery || undefined,
+        categoryIds: filters.categoryIds,
+        accountIds: filters.accountIds,
+        sources: filters.sources,
+        dateFrom: filters.dateRange?.start,
+        dateTo: filters.dateRange?.end,
+        sortBy: sortField,
+        sortDir: sortDirection,
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+      })
       if (data.transactions.length > 0) {
-        setTransactions(data.transactions)
+        setTransactions(data.transactions as Transaction[])
         setTotalCount(data.totalCount)
       } else {
         // Keep sample data as demo placeholder — restore matching reference data
@@ -324,17 +325,9 @@ export default function TransactionsPage() {
           }
 
           if (editingTransaction) {
-            await fetch(`/api/transactions/${editingTransaction.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(apiData),
-            })
+            await updateTransaction(editingTransaction.id, apiData)
           } else {
-            await fetch('/api/transactions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(apiData),
-            })
+            await createTransaction(apiData)
           }
 
           // Refetch
@@ -392,9 +385,7 @@ export default function TransactionsPage() {
 
     if (useApi) {
       try {
-        await fetch(`/api/transactions/${deletingTransaction.id}`, {
-          method: 'DELETE',
-        })
+        await deleteTransaction(deletingTransaction.id)
         await fetchTransactions()
       } catch {
         // Ignore
