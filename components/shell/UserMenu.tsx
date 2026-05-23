@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Settings, LogOut, ChevronUp } from 'lucide-react'
+import { Avatar } from '@/components/ui'
 
 export interface User {
   name: string
@@ -20,7 +21,6 @@ export function UserMenu({ user, isCollapsed, onLogout, onNavigate }: UserMenuPr
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Get initials from name
   const initials = user.name
     .split(' ')
     .map((part) => part[0])
@@ -28,14 +28,12 @@ export function UserMenu({ user, isCollapsed, onLogout, onNavigate }: UserMenuPr
     .toUpperCase()
     .slice(0, 2)
 
-  // Close menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false)
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
@@ -44,64 +42,51 @@ export function UserMenu({ user, isCollapsed, onLogout, onNavigate }: UserMenuPr
     <div ref={menuRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`
-          flex w-full items-center gap-3 rounded-md p-2
-          text-left transition-colors
-          hover:bg-slate-100 dark:hover:bg-slate-800
-          ${isCollapsed ? 'justify-center' : ''}
-        `}
+        className="flex w-full items-center text-left"
+        style={{
+          gap: 12,
+          borderRadius: 12,
+          padding: 6,
+          justifyContent: isCollapsed ? 'center' : 'flex-start',
+          background: isOpen ? 'rgba(255,255,255,0.04)' : 'transparent',
+          transition: 'background .15s',
+        }}
       >
-        {/* Avatar */}
         {user.avatarUrl ? (
-          <img
-            src={user.avatarUrl}
-            alt={user.name}
-            className="h-8 w-8 shrink-0 aspect-square rounded-full object-cover"
-          />
+          <img src={user.avatarUrl} alt={user.name} className="h-9 w-9 shrink-0 aspect-square rounded-full object-cover" />
         ) : (
-          <div className="flex h-8 w-8 shrink-0 aspect-square items-center justify-center rounded-full bg-emerald-600 text-xs font-medium text-white">
-            {initials}
-          </div>
+          <Avatar initials={initials} size={36} />
         )}
 
-        {/* User Info */}
         {!isCollapsed && (
           <>
             <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+              <p className="truncate" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>
                 {user.name}
               </p>
-              <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+              <p className="truncate" style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg3)' }}>
                 {user.email}
               </p>
             </div>
-            <ChevronUp
-              className={`h-4 w-4 text-slate-500 transition-transform ${
-                isOpen ? '' : 'rotate-180'
-              }`}
-            />
+            <ChevronUp size={16} style={{ color: 'var(--fg3)', transform: isOpen ? 'none' : 'rotate(180deg)', transition: 'transform .15s' }} />
           </>
         )}
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
         <div
-          className={`
-            absolute z-50 w-56 rounded-lg border border-slate-200
-            bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800
-            ${isCollapsed ? 'bottom-0 left-full ml-2' : 'bottom-full left-0 mb-2'}
-          `}
+          className={`absolute z-50 w-56 py-1 ${isCollapsed ? 'bottom-0 left-full ml-2' : 'bottom-full left-0 mb-2'}`}
+          style={{
+            background: 'var(--bg2)',
+            border: '1px solid var(--card-border)',
+            borderRadius: 14,
+            boxShadow: '0 30px 80px -30px rgba(0,0,0,0.7)',
+          }}
         >
-          {/* User Info Header (collapsed mode) */}
           {isCollapsed && (
-            <div className="border-b border-slate-200 px-3 py-2 dark:border-slate-700">
-              <p className="text-sm font-medium text-slate-900 dark:text-white">
-                {user.name}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {user.email}
-              </p>
+            <div style={{ borderBottom: '1px solid var(--card-border)', padding: '8px 12px' }}>
+              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{user.name}</p>
+              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg3)' }}>{user.email}</p>
             </div>
           )}
 
@@ -110,40 +95,27 @@ export function UserMenu({ user, isCollapsed, onLogout, onNavigate }: UserMenuPr
               onNavigate?.('/settings')
               setIsOpen(false)
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+            className="flex w-full items-center gap-2 px-3 py-2"
+            style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg2)' }}
           >
-            <Settings className="h-4 w-4" />
+            <Settings size={16} />
             Settings
           </button>
 
-          <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
+          <div style={{ margin: '4px 0', borderTop: '1px solid var(--card-border)' }} />
 
           <button
             onClick={() => {
               onLogout?.()
               setIsOpen(false)
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+            className="flex w-full items-center gap-2 px-3 py-2"
+            style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--bad)' }}
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut size={16} />
             Log out
           </button>
         </div>
-      )}
-
-      {/* Tooltip for collapsed state (when menu is closed) */}
-      {isCollapsed && !isOpen && (
-        <span
-          className="
-            pointer-events-none absolute bottom-0 left-full ml-2 rounded-md
-            bg-slate-900 px-2 py-1 text-xs font-medium text-white
-            opacity-0 transition-opacity group-hover:opacity-100
-            dark:bg-slate-700
-            whitespace-nowrap
-          "
-        >
-          {user.name}
-        </span>
       )}
     </div>
   )

@@ -3,6 +3,10 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AppShell } from '@/components/shell/AppShell'
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
+}))
+
 describe('AppShell', () => {
   const defaultNavItems = [
     { label: 'Dashboard', href: '/dashboard', icon: 'dashboard' as const, isActive: true },
@@ -21,7 +25,7 @@ describe('AppShell', () => {
     render(
       <AppShell navigationItems={defaultNavItems} user={defaultUser}>
         <div>Content</div>
-      </AppShell>
+      </AppShell>,
     )
     const brandElements = screen.getAllByText('Ledger')
     expect(brandElements.length).toBeGreaterThanOrEqual(1)
@@ -31,32 +35,32 @@ describe('AppShell', () => {
     render(
       <AppShell navigationItems={defaultNavItems} user={defaultUser}>
         <div data-testid="page-content">Dashboard content</div>
-      </AppShell>
+      </AppShell>,
     )
     expect(screen.getByTestId('page-content')).toBeInTheDocument()
   })
 
-  it('renders all navigation items', () => {
+  it('renders all navigation items (collapsed rail exposes them as titles)', () => {
     render(
       <AppShell navigationItems={defaultNavItems} user={defaultUser}>
         <div>Content</div>
-      </AppShell>
+      </AppShell>,
     )
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Transactions')).toBeInTheDocument()
-    expect(screen.getByText('Accounts')).toBeInTheDocument()
-    expect(screen.getByText('Budgets')).toBeInTheDocument()
-    expect(screen.getByText('Automation')).toBeInTheDocument()
+    expect(screen.getByTitle('Dashboard')).toBeInTheDocument()
+    expect(screen.getByTitle('Transactions')).toBeInTheDocument()
+    expect(screen.getByTitle('Accounts')).toBeInTheDocument()
+    expect(screen.getByTitle('Budgets')).toBeInTheDocument()
+    expect(screen.getByTitle('Automation')).toBeInTheDocument()
   })
 
-  it('renders user menu with user info', () => {
+  it('renders the user avatar initials', () => {
     render(
       <AppShell navigationItems={defaultNavItems} user={defaultUser}>
         <div>Content</div>
-      </AppShell>
+      </AppShell>,
     )
-    expect(screen.getByText('John Doe')).toBeInTheDocument()
-    expect(screen.getByText('john@example.com')).toBeInTheDocument()
+    // collapsed rail shows initials; topbar avatar also renders them
+    expect(screen.getAllByText('JD').length).toBeGreaterThanOrEqual(1)
   })
 
   it('calls onNavigate when a nav item is clicked', async () => {
@@ -65,28 +69,19 @@ describe('AppShell', () => {
     render(
       <AppShell navigationItems={defaultNavItems} user={defaultUser} onNavigate={onNavigate}>
         <div>Content</div>
-      </AppShell>
+      </AppShell>,
     )
 
-    await user.click(screen.getByText('Transactions'))
+    await user.click(screen.getByTitle('Transactions'))
     expect(onNavigate).toHaveBeenCalledWith('/transactions')
   })
 
-  it('does not render user menu when no user provided', () => {
+  it('does not render user info when no user provided', () => {
     render(
       <AppShell navigationItems={defaultNavItems}>
         <div>Content</div>
-      </AppShell>
+      </AppShell>,
     )
-    expect(screen.queryByText('John Doe')).not.toBeInTheDocument()
-  })
-
-  it('renders the Smart Finance tagline', () => {
-    render(
-      <AppShell navigationItems={defaultNavItems} user={defaultUser}>
-        <div>Content</div>
-      </AppShell>
-    )
-    expect(screen.getByText('Smart Finance')).toBeInTheDocument()
+    expect(screen.queryByText('JD')).not.toBeInTheDocument()
   })
 })

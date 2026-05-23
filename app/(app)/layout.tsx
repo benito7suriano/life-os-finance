@@ -25,8 +25,8 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-100 dark:bg-slate-900">
-        <div className="text-slate-500">Loading...</div>
+      <div className="flex h-screen items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>Loading…</div>
       </div>
     )
   }
