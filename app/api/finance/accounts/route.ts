@@ -156,6 +156,7 @@ export async function GET(request: NextRequest) {
           paymentDate: a.payment_date,
           interestRate: Number(a.interest_rate),
           creditLimit: Number(a.credit_limit),
+          currency: a.currency || 'USD',
         }
       case 'loan':
         return {
@@ -170,12 +171,21 @@ export async function GET(request: NextRequest) {
           termMonths: a.term_months,
           originationDate: a.origination_date,
           maturityDate: a.maturity_date,
+          currency: a.currency || 'USD',
         }
       case 'wallet':
         return {
           ...base,
           icon: a.icon || 'wallet',
           currency: a.currency || 'USD',
+        }
+      case 'investment':
+        return {
+          ...base,
+          assetClass: a.asset_class || null,
+          currency: a.currency || 'USD',
+          institutionId: a.institution_id || null,
+          institutionName: a.institution?.name || null,
         }
       default:
         return base

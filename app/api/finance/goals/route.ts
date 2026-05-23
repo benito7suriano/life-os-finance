@@ -20,7 +20,7 @@ export async function GET(_request: NextRequest) {
       *,
       category:categories(id, name, color, icon, type),
       linked_account:accounts(id, name, type, icon),
-      linked_budget:budgets(id, amount, type)
+      linked_budget:budgets!fk_goals_linked_budget(id, amount, type)
     `
     )
     .eq('user_id', user.id)

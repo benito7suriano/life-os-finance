@@ -14,6 +14,7 @@ const accountTypeLabels: Record<AccountType, string> = {
   credit_card: 'Credit Card',
   loan: 'Loan',
   wallet: 'Wallet / Cash',
+  investment: 'Investment / Asset',
 }
 
 const accountTypeOptions: { value: AccountType; label: string }[] = [
@@ -22,6 +23,7 @@ const accountTypeOptions: { value: AccountType; label: string }[] = [
   { value: 'credit_card', label: 'Credit Card' },
   { value: 'loan', label: 'Loan' },
   { value: 'wallet', label: 'Wallet / Cash' },
+  { value: 'investment', label: 'Investment / Asset' },
 ]
 
 function formatCurrency(amount: number): string {

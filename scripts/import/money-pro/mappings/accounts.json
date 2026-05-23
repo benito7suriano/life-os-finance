@@ -1,0 +1,307 @@
+[
+  {
+    "sourceNames": [
+      "8-VII 154"
+    ],
+    "targetName": "8-VII 154",
+    "type": "investment",
+    "assetClass": "real_estate",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "AFP"
+    ],
+    "targetName": "AFP",
+    "type": "investment",
+    "assetClass": "pension",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Alpha Inversiones"
+    ],
+    "targetName": "Alpha Inversiones",
+    "type": "investment",
+    "assetClass": "investment_fund",
+    "currency": "DOP"
+  },
+  {
+    "sourceNames": [
+      "Atlántida (Crecimiento)"
+    ],
+    "targetName": "Atlántida (Crecimiento)",
+    "type": "investment",
+    "assetClass": "investment_fund",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Atlántida (Liquidez)"
+    ],
+    "targetName": "Atlántida (Liquidez)",
+    "type": "investment",
+    "assetClass": "investment_fund",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Aureus Investments Corp"
+    ],
+    "targetName": "Aureus Investments Corp",
+    "type": "investment",
+    "assetClass": "investment_fund",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "BAC AMEX 7785"
+    ],
+    "targetName": "BAC AMEX 7785",
+    "type": "credit_card",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "BAC Checking XXXXX9114"
+    ],
+    "targetName": "BAC Checking XXXXX9114",
+    "type": "checking",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "BAC Savings XXXXX5943"
+    ],
+    "targetName": "BAC Savings XXXXX5943",
+    "type": "savings",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "BAC VISA 3448"
+    ],
+    "targetName": "BAC VISA 3448",
+    "type": "credit_card",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Cash DOP"
+    ],
+    "targetName": "Cash DOP",
+    "type": "wallet",
+    "currency": "DOP"
+  },
+  {
+    "sourceNames": [
+      "Cash USD"
+    ],
+    "targetName": "Cash USD",
+    "type": "wallet",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Depósito D28 - 303"
+    ],
+    "targetName": "Depósito D28 - 303",
+    "type": "wallet",
+    "currency": "USD",
+    "notes": "Per user: cash deposit account, not asset"
+  },
+  {
+    "sourceNames": [
+      "Depósito D28 - 604"
+    ],
+    "targetName": "Depósito D28 - 604",
+    "type": "wallet",
+    "currency": "USD",
+    "notes": "Per user: cash deposit account, not asset"
+  },
+  {
+    "sourceNames": [
+      "Ex - Wells Fargo SC"
+    ],
+    "targetName": "Ex - Wells Fargo SC",
+    "type": "checking",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Hyundai Tucson Eco 2017"
+    ],
+    "targetName": "Hyundai Tucson Eco 2017",
+    "type": "investment",
+    "assetClass": "vehicle",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "JPM Checking 2756"
+    ],
+    "targetName": "JPM Checking 2756",
+    "type": "checking",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "JPM Savings 9166"
+    ],
+    "targetName": "JPM Savings 9166",
+    "type": "savings",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Liberty Place"
+    ],
+    "targetName": "Liberty Place",
+    "type": "investment",
+    "assetClass": "real_estate",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "PaaS"
+    ],
+    "targetName": "PaaS",
+    "type": "investment",
+    "assetClass": "business",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Popular 1778"
+    ],
+    "targetName": "Popular 1778",
+    "type": "credit_card",
+    "currency": "DOP",
+    "notes": "Per user: Visa credit card (was checking in Money Pro export)"
+  },
+  {
+    "sourceNames": [
+      "Popular 8471 (USD)"
+    ],
+    "targetName": "Popular 8471 (USD)",
+    "type": "checking",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Popular 9652 (DOP)"
+    ],
+    "targetName": "Popular 9652 (DOP)",
+    "type": "checking",
+    "currency": "DOP"
+  },
+  {
+    "sourceNames": [
+      "Popular GOLD DOP"
+    ],
+    "targetName": "Popular GOLD DOP",
+    "type": "credit_card",
+    "currency": "DOP"
+  },
+  {
+    "sourceNames": [
+      "Popular GOLD USD"
+    ],
+    "targetName": "Popular GOLD USD",
+    "type": "credit_card",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Préstamos"
+    ],
+    "targetName": "Préstamos",
+    "type": "loan",
+    "currency": "USD",
+    "notes": "Was \"Préstamos\" in Money Pro — verify if asset (owed to you) or liability (you owe)"
+  },
+  {
+    "sourceNames": [
+      "RL360"
+    ],
+    "targetName": "RL360",
+    "type": "investment",
+    "assetClass": "retirement",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "ScotiaB Savings XXXX3782"
+    ],
+    "targetName": "ScotiaB Savings XXXX3782",
+    "type": "savings",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Sky 01"
+    ],
+    "targetName": "Sky 01",
+    "type": "investment",
+    "assetClass": "real_estate",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "VISA PLATINUM DOP"
+    ],
+    "targetName": "VISA PLATINUM DOP",
+    "type": "credit_card",
+    "currency": "DOP"
+  },
+  {
+    "sourceNames": [
+      "VISA PLATINUM USD"
+    ],
+    "targetName": "VISA PLATINUM USD",
+    "type": "credit_card",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Wahoo"
+    ],
+    "targetName": "Wahoo",
+    "type": "investment",
+    "assetClass": "investment_fund",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "Wallet (DOP)"
+    ],
+    "targetName": "Wallet (DOP)",
+    "type": "wallet",
+    "currency": "DOP"
+  },
+  {
+    "sourceNames": [
+      "Wallet",
+      "Wallet (USD)"
+    ],
+    "targetName": "Wallet (USD)",
+    "type": "wallet",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "WF Checking XXXXXX2947"
+    ],
+    "targetName": "WF Checking XXXXXX2947",
+    "type": "checking",
+    "currency": "USD"
+  },
+  {
+    "sourceNames": [
+      "WF Savings XXXXXX9210"
+    ],
+    "targetName": "WF Savings XXXXXX9210",
+    "type": "savings",
+    "currency": "USD"
+  }
+]

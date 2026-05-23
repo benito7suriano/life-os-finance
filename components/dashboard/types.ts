@@ -46,7 +46,7 @@ export interface Summary {
 export interface Account {
   id: string
   name: string
-  type: 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet'
+  type: 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet' | 'investment'
   institution?: string
   balance: number
   creditLimit?: number

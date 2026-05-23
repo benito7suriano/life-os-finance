@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createFinanceClient } from '@/lib/supabase/server'
+import { toUsd } from '@/lib/fx'
 
 export async function GET(_request: NextRequest) {
   const supabase = await createFinanceClient()
@@ -21,12 +22,12 @@ export async function GET(_request: NextRequest) {
   const [accountsRes, txRes, budgetsRes, snapshotsRes] = await Promise.all([
     supabase
       .from('accounts')
-      .select('type, balance, credit_limit, original_amount')
+      .select('id, type, balance, currency, credit_limit, original_amount')
       .eq('user_id', user.id)
       .is('deleted_at', null),
     supabase
       .from('transactions')
-      .select('type, amount, category_id')
+      .select('type, amount, category_id, from_account_id, to_account_id, to_amount, to_currency')
       .eq('user_id', user.id)
       .gte('date', monthStart)
       .lte('date', monthEnd),
@@ -50,29 +51,42 @@ export async function GET(_request: NextRequest) {
   const budgets = budgetsRes.data ?? []
   const snapshots = snapshotsRes.data ?? []
 
+  // currency lookup per account_id, used for converting transaction amounts.
+  const currencyByAccount = new Map<string, string>()
+  for (const a of accounts) currencyByAccount.set(a.id, a.currency || 'USD')
+
+  // Assets: cash + savings + investments. Liabilities: credit cards + loans.
+  // All summed in USD via toUsd().
   const assets = accounts
-    .filter((a) => ['checking', 'savings'].includes(a.type))
-    .reduce((sum, a) => sum + Number(a.balance), 0)
+    .filter((a) => ['checking', 'savings', 'wallet', 'investment'].includes(a.type))
+    .reduce((sum, a) => sum + toUsd(Number(a.balance), a.currency), 0)
 
   const liabilities = accounts
-    .filter((a) => ['credit', 'loan'].includes(a.type))
-    .reduce((sum, a) => sum + Number(a.balance), 0)
+    .filter((a) => ['credit_card', 'loan'].includes(a.type))
+    .reduce((sum, a) => sum + toUsd(Number(a.balance), a.currency), 0)
 
   const netWorth = assets - liabilities
 
+  /** Currency for a transaction's "source" side: the account where money came from / went to. */
+  function txCurrency(t: { type: string; from_account_id: string | null; to_account_id: string | null }): string {
+    const accountId = t.type === 'income' ? t.to_account_id : t.from_account_id
+    if (accountId && currencyByAccount.has(accountId)) return currencyByAccount.get(accountId)!
+    return 'USD'
+  }
+
   const monthlyIncome = transactions
     .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + Number(t.amount), 0)
+    .reduce((sum, t) => sum + toUsd(Number(t.amount), txCurrency(t)), 0)
 
   const monthlyExpenses = transactions
     .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + Number(t.amount), 0)
+    .reduce((sum, t) => sum + toUsd(Number(t.amount), txCurrency(t)), 0)
 
   const spentByCategory = transactions
     .filter((t) => t.type === 'expense' && t.category_id)
     .reduce<Record<string, number>>((acc, t) => {
       const key = t.category_id as string
-      acc[key] = (acc[key] ?? 0) + Number(t.amount)
+      acc[key] = (acc[key] ?? 0) + toUsd(Number(t.amount), txCurrency(t))
       return acc
     }, {})
 

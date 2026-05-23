@@ -271,9 +271,18 @@ export function TransactionList({
                 </tr>
               ) : (
                 transactions.map((transaction) => {
-                  const category = getCategoryById(transaction.categoryId)
-                  const account = getAccountById(transaction.accountId)
-                  if (!category || !account) return null
+                  const category = getCategoryById(transaction.categoryId) ?? {
+                    id: '',
+                    name: 'Uncategorized',
+                    color: '#94a3b8',
+                    type: (transaction.type === 'income' ? 'income' : 'expense') as 'income' | 'expense',
+                  }
+                  const account = getAccountById(transaction.accountId) ?? {
+                    id: '',
+                    name: 'Unknown account',
+                    type: 'checking' as const,
+                    icon: 'wallet',
+                  }
 
                   return (
                     <TransactionRow

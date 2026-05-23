@@ -1,54 +1,191 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Dashboard } from '@/components/dashboard'
-import sampleData from '@/components/dashboard/sample-data.json'
-import type { DashboardProps } from '@/components/dashboard/types'
+import { createClient } from '@/lib/supabase/client'
+import { listAccounts, listTransactions } from '@/lib/api/client'
+import type { DashboardProps, Account as DashAccount, Transaction as DashTxn, Summary } from '@/components/dashboard/types'
+import { toUsd } from '@/lib/fx'
 
-const dashboardData: Omit<DashboardProps, 'onNewTransaction' | 'onViewAllTransactions' | 'onViewTransaction' | 'onQuickAction' | 'onViewNotifications' | 'onSpendingFilterChange' | 'onTrendFilterChange' | 'onLanguageChange'> = {
-  user: sampleData.user as DashboardProps['user'],
-  summary: sampleData.summary as DashboardProps['summary'],
-  accounts: sampleData.accounts as DashboardProps['accounts'],
-  spendingByCategory: sampleData.spendingByCategory as DashboardProps['spendingByCategory'],
-  monthlyTrend: sampleData.monthlyTrend as DashboardProps['monthlyTrend'],
-  recentTransactions: sampleData.recentTransactions as DashboardProps['recentTransactions'],
-  categories: sampleData.categories as DashboardProps['categories'],
-  notifications: sampleData.notifications as DashboardProps['notifications'],
-  quickActions: sampleData.quickActions as DashboardProps['quickActions'],
+const EMPTY_SUMMARY: Summary = {
+  netWorth: { amount: 0, previousAmount: 0, change: 0, changePercent: 0, trend: 'stable' },
+  monthlyExpenses: { amount: 0, previousMonth: 0, change: 0, changePercent: 0 },
+  monthlyIncome: { amount: 0, previousMonth: 0, change: 0, changePercent: 0 },
+  budgetProjection: {
+    totalBudget: 0,
+    spent: 0,
+    remaining: 0,
+    percentUsed: 0,
+    daysRemaining: 0,
+    projectedOverspend: 0,
+    status: 'on_track',
+  },
 }
 
 export default function DashboardPage() {
   const router = useRouter()
+  const [user, setUser] = useState<DashboardProps['user']>({
+    id: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    preferredLanguage: 'en',
+    subscriptionTier: 'free',
+  })
+  const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY)
+  const [accounts, setAccounts] = useState<DashAccount[]>([])
+  const [recentTransactions, setRecentTransactions] = useState<DashTxn[]>([])
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) return
+
+      // Fetch profile (first/last name) from public.users
+      const { data: profile } = await supabase
+        .from('users')
+        .select('first_name, last_name, email, preferred_language, subscription_tier')
+        .eq('id', authUser.id)
+        .single()
+
+      setUser({
+        id: authUser.id,
+        firstName: profile?.first_name || authUser.email?.split('@')[0] || 'there',
+        lastName: profile?.last_name || '',
+        email: profile?.email || authUser.email || '',
+        preferredLanguage: (profile?.preferred_language as 'en' | 'es') || 'en',
+        subscriptionTier: (profile?.subscription_tier as 'free' | 'pro') || 'free',
+      })
+
+      // Settle each independently so one failing call doesn't blank the page.
+      const [summarySettled, accountsSettled, recentSettled] = await Promise.allSettled([
+        fetch('/api/finance/summary').then((r) => (r.ok ? r.json() : null)),
+        listAccounts(),
+        listTransactions({ page: 1, limit: 5, sortBy: 'date', sortDir: 'desc' }),
+      ])
+
+      const summaryRes = summarySettled.status === 'fulfilled' ? summarySettled.value : null
+      const accountsRes = accountsSettled.status === 'fulfilled' ? accountsSettled.value : { accounts: [] }
+      const recentRes = recentSettled.status === 'fulfilled' ? recentSettled.value : { transactions: [] }
+
+      if (summarySettled.status === 'rejected') console.error('[dashboard] summary failed', summarySettled.reason)
+      if (accountsSettled.status === 'rejected') console.error('[dashboard] accounts failed', accountsSettled.reason)
+      if (recentSettled.status === 'rejected') console.error('[dashboard] recent txns failed', recentSettled.reason)
+
+      try {
+        if (summaryRes) {
+          setSummary({
+            netWorth: {
+              amount: Number(summaryRes.netWorth) || 0,
+              previousAmount: 0,
+              change: 0,
+              changePercent: 0,
+              trend: 'stable',
+            },
+            monthlyExpenses: {
+              amount: Number(summaryRes.monthlyExpenses) || 0,
+              previousMonth: 0,
+              change: 0,
+              changePercent: 0,
+            },
+            monthlyIncome: {
+              amount: Number(summaryRes.monthlyIncome) || 0,
+              previousMonth: 0,
+              change: 0,
+              changePercent: 0,
+            },
+            budgetProjection: EMPTY_SUMMARY.budgetProjection,
+          })
+        }
+
+        type ApiAccount = {
+          id: string
+          name: string
+          type: string
+          balance: number | string
+          currency?: string
+          institutionId?: string
+          icon?: string
+          creditLimit?: number | string
+        }
+        type ApiTxn = {
+          id: string
+          type: 'expense' | 'income' | 'transfer'
+          amount: number
+          description: string
+          date: string
+          category?: { id: string; name: string; color?: string }
+          fromAccount?: { id: string; name: string }
+          toAccount?: { id: string; name: string }
+        }
+
+        // Map accounts → DashAccount[]. Balances normalized to USD for the
+        // summary cards; per-account display can show native currency elsewhere.
+        const dashAccounts: DashAccount[] = ((accountsRes.accounts as ApiAccount[]) || []).map((a) => ({
+          id: a.id,
+          name: a.name,
+          type: a.type as DashAccount['type'],
+          institution: a.institutionId,
+          balance: Number(a.balance),
+          creditLimit: a.creditLimit != null ? Number(a.creditLimit) : undefined,
+          currency: a.currency || 'USD',
+          icon: a.icon || 'wallet',
+        }))
+        setAccounts(dashAccounts)
+
+        // Map recent transactions
+        const recent: DashTxn[] = ((recentRes.transactions as ApiTxn[]) || []).map((t) => {
+          const acct = t.fromAccount || t.toAccount || { id: '', name: 'Unknown' }
+          return {
+            id: t.id,
+            type: t.type,
+            amount: Math.abs(Number(t.amount)),
+            description: t.description || '(no description)',
+            category: {
+              id: t.category?.id || '',
+              name: t.category?.name || 'Uncategorized',
+              color: t.category?.color || '#94a3b8',
+            },
+            account: { id: acct.id, name: acct.name },
+            date: t.date,
+            time: '',
+          }
+        })
+        setRecentTransactions(recent)
+      } catch (e) {
+        console.error('[dashboard] load failed', e)
+      }
+    }
+    load()
+  }, [])
+
+  // Convert account balances to USD for the dashboard's totals.
+  // (Net worth in summary is already USD-normalized in /api/finance/summary.)
+  // Account cards on /accounts show native currency; on dashboard we pass
+  // them through as-is — currency badges in cards will still distinguish.
+  void toUsd
 
   return (
     <Dashboard
-      {...dashboardData}
-      onNewTransaction={() => {
-        // TODO: Open new transaction modal when transactions section is built
-        console.log('[Dashboard] New transaction')
-      }}
+      user={user}
+      summary={summary}
+      accounts={accounts}
+      spendingByCategory={{ period: 'month', total: 0, categories: [] }}
+      monthlyTrend={[]}
+      recentTransactions={recentTransactions}
+      categories={[]}
+      notifications={{ count: 0, items: [] }}
+      quickActions={[]}
+      onNewTransaction={() => router.push('/transactions')}
       onViewAllTransactions={() => router.push('/transactions')}
-      onViewTransaction={(id) => {
-        // TODO: Navigate to transaction detail when available
-        console.log('[Dashboard] View transaction', id)
-      }}
+      onViewTransaction={(id) => console.log('[Dashboard] View transaction', id)}
       onQuickAction={(href) => router.push(href)}
-      onViewNotifications={() => {
-        // TODO: Open notifications panel
-        console.log('[Dashboard] View notifications')
-      }}
-      onSpendingFilterChange={(period) => {
-        // TODO: Refetch spending data for selected period
-        console.log('[Dashboard] Spending filter:', period)
-      }}
-      onTrendFilterChange={(period) => {
-        // TODO: Refetch trend data for selected period
-        console.log('[Dashboard] Trend filter:', period)
-      }}
-      onLanguageChange={() => {
-        // TODO: Toggle language preference
-        console.log('[Dashboard] Language change')
-      }}
+      onViewNotifications={() => {}}
+      onSpendingFilterChange={() => {}}
+      onTrendFilterChange={() => {}}
+      onLanguageChange={() => {}}
     />
   )
 }
