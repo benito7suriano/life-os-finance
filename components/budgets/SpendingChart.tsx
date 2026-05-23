@@ -8,7 +8,10 @@ interface SpendingChartProps {
 
 export function SpendingChart({ data, timeRange, onTimeRangeChange }: SpendingChartProps) {
   // Filter data based on time range
-  const visibleData = timeRange === '6months' ? data.slice(-6) : data
+  const visibleData =
+    timeRange === '6months' ? data.slice(-6)
+    : timeRange === '12months' ? data.slice(-12)
+    : data
 
   // Calculate chart dimensions
   const chartWidth = 600
@@ -30,11 +33,27 @@ export function SpendingChart({ data, timeRange, onTimeRangeChange }: SpendingCh
     return chartPadding.top + usableHeight - (value / maxValue) * usableHeight
   }
 
-  // Generate path for line
-  const generatePath = (key: 'budgeted' | 'spent') => {
+  // Generate path for the spent line (continuous across all months)
+  const generateSpentPath = () => {
     return visibleData
-      .map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d[key])}`)
+      .map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.spent)}`)
       .join(' ')
+  }
+
+  // Generate path for the budgeted line, breaking into segments wherever the
+  // budget is unknown (0) so old pre-budget months render as honest gaps.
+  const generateBudgetPath = () => {
+    const segments: string[] = []
+    let prevKnown = false
+    visibleData.forEach((d, i) => {
+      if (d.budgeted > 0) {
+        segments.push(`${prevKnown ? 'L' : 'M'} ${getX(i)} ${getY(d.budgeted)}`)
+        prevKnown = true
+      } else {
+        prevKnown = false
+      }
+    })
+    return segments.join(' ')
   }
 
   // Generate area path for spent (filled area under curve)
@@ -81,6 +100,18 @@ export function SpendingChart({ data, timeRange, onTimeRangeChange }: SpendingCh
             `}
           >
             12 months
+          </button>
+          <button
+            onClick={() => onTimeRangeChange?.('all')}
+            className={`
+              px-3 py-1.5 text-sm font-medium rounded-md transition-all
+              ${timeRange === 'all'
+                ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }
+            `}
+          >
+            All
           </button>
         </div>
       </div>
@@ -143,9 +174,9 @@ export function SpendingChart({ data, timeRange, onTimeRangeChange }: SpendingCh
             fill="url(#spentGradient)"
           />
 
-          {/* Budget line (dashed) */}
+          {/* Budget line (dashed, broken across unknown months) */}
           <path
-            d={generatePath('budgeted')}
+            d={generateBudgetPath()}
             fill="none"
             className="stroke-slate-400 dark:stroke-slate-500"
             strokeWidth="2"
@@ -154,7 +185,7 @@ export function SpendingChart({ data, timeRange, onTimeRangeChange }: SpendingCh
 
           {/* Spent line */}
           <path
-            d={generatePath('spent')}
+            d={generateSpentPath()}
             fill="none"
             className="stroke-emerald-500"
             strokeWidth="2.5"
@@ -173,18 +204,23 @@ export function SpendingChart({ data, timeRange, onTimeRangeChange }: SpendingCh
             />
           ))}
 
-          {/* X-axis labels */}
-          {visibleData.map((d, i) => (
-            <text
-              key={i}
-              x={getX(i)}
-              y={chartHeight - 10}
-              textAnchor="middle"
-              className="fill-slate-500 dark:fill-slate-400 text-[10px]"
-            >
-              {d.month.split(' ')[0].slice(0, 3)}
-            </text>
-          ))}
+          {/* X-axis labels (thinned so dense ranges stay legible) */}
+          {visibleData.map((d, i) => {
+            const labelStep = Math.ceil(visibleData.length / 12)
+            const showLabel = i % labelStep === 0 || i === visibleData.length - 1
+            if (!showLabel) return null
+            return (
+              <text
+                key={i}
+                x={getX(i)}
+                y={chartHeight - 10}
+                textAnchor="middle"
+                className="fill-slate-500 dark:fill-slate-400 text-[10px]"
+              >
+                {d.month.split(' ')[0].slice(0, 3)}
+              </text>
+            )
+          })}
         </svg>
       </div>
     </div>

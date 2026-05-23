@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createFinanceClient } from '@/lib/supabase/server'
+import { toUsd } from '@/lib/fx'
 
 export async function GET(request: NextRequest) {
   const supabase = await createFinanceClient()
@@ -41,8 +42,18 @@ export async function GET(request: NextRequest) {
     .eq('type', 'expense')
     .order('name')
 
-  const parentCategories = (allCategories || []).filter(c => !c.parent_id)
-  const childCategories = (allCategories || []).filter(c => c.parent_id)
+  // Categories that represent bookkeeping artifacts rather than real spending.
+  // "Balance Adjustment" is a Money Pro reconciliation entry (trues an account's
+  // computed balance up to its actual balance) — exclude it from all spend rollups.
+  const EXCLUDED_CATEGORY_NAMES = new Set(['balance adjustment'])
+  const excludedCategoryIds = new Set(
+    (allCategories || [])
+      .filter(c => EXCLUDED_CATEGORY_NAMES.has((c.name || '').trim().toLowerCase()))
+      .map(c => c.id)
+  )
+
+  const parentCategories = (allCategories || []).filter(c => !c.parent_id && !excludedCategoryIds.has(c.id))
+  const childCategories = (allCategories || []).filter(c => c.parent_id && !excludedCategoryIds.has(c.id))
 
   const categories = parentCategories.map(parent => ({
     id: parent.id,
@@ -77,20 +88,33 @@ export async function GET(request: NextRequest) {
     dbContributions = data || []
   }
 
-  // 5. Compute spent per category for the month
+  // Currency lookup per account — expense amounts are stored in the
+  // from-account's currency (DOP or USD) and must be converted to USD before
+  // they can be summed together.
+  const { data: allAccounts } = await supabase
+    .from('accounts')
+    .select('id, currency')
+    .eq('user_id', user.id)
+
+  const currencyByAccount = new Map<string, string>()
+  for (const a of allAccounts || []) currencyByAccount.set(a.id, a.currency || 'USD')
+  const usd = (amount: number | string, accountId: string | null) =>
+    toUsd(Number(amount), accountId ? currencyByAccount.get(accountId) ?? 'USD' : 'USD')
+
+  // 5. Compute spent per category for the month (in USD)
   const { data: monthTransactions } = await supabase
     .from('transactions')
-    .select('category_id, amount')
+    .select('category_id, amount, from_account_id')
     .eq('user_id', user.id)
     .eq('type', 'expense')
     .gte('date', monthStart)
     .lt('date', monthEnd)
 
-  // Aggregate spent by category_id
+  // Aggregate spent by category_id (excluding bookkeeping categories)
   const spentByCategory: Record<string, number> = {}
   for (const t of monthTransactions || []) {
-    if (t.category_id) {
-      spentByCategory[t.category_id] = (spentByCategory[t.category_id] || 0) + Number(t.amount)
+    if (t.category_id && !excludedCategoryIds.has(t.category_id)) {
+      spentByCategory[t.category_id] = (spentByCategory[t.category_id] || 0) + usd(t.amount, t.from_account_id)
     }
   }
 
@@ -99,6 +123,45 @@ export async function GET(request: NextRequest) {
   for (const c of childCategories) {
     childToParent[c.id] = c.parent_id
   }
+
+  // Determine the full-history window: from the earliest expense transaction's
+  // month up to (and including) the target month.
+  const { data: earliestTxRows } = await supabase
+    .from('transactions')
+    .select('date')
+    .eq('user_id', user.id)
+    .eq('type', 'expense')
+    .order('date', { ascending: true })
+    .limit(1)
+
+  const earliestTxDate = earliestTxRows?.[0]?.date
+    ? new Date(earliestTxRows[0].date)
+    : new Date(targetYear, targetMonth - 1, 1)
+  const historyStart = new Date(earliestTxDate.getFullYear(), earliestTxDate.getMonth(), 1)
+  const historyStartStr = `${historyStart.getFullYear()}-${String(historyStart.getMonth() + 1).padStart(2, '0')}-01`
+
+  // Fetch snapshots across the full history window
+  const { data: snapshots } = await supabase
+    .from('budget_monthly_snapshots')
+    .select('budget_id, month, budgeted_amount')
+    .eq('user_id', user.id)
+    .gte('month', historyStartStr)
+    .lt('month', monthEnd)
+
+  // Snapshot lookups: per budget for the target month, and aggregate per month
+  const targetSnapshotByBudget: Record<string, number> = {}
+  const snapshotsByMonth: Record<string, number> = {}
+  for (const s of snapshots || []) {
+    if (s.month === monthStart) {
+      targetSnapshotByBudget[s.budget_id] = Number(s.budgeted_amount)
+    }
+    const sKey = new Date(s.month).toLocaleString('en-US', { month: 'short', year: 'numeric' })
+    snapshotsByMonth[sKey] = (snapshotsByMonth[sKey] || 0) + Number(s.budgeted_amount)
+  }
+
+  // Whether the target month is the current calendar month
+  const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const isCurrentMonth = monthStart === currentMonthStart
 
   // Map budgets to component format
   const budgets = (dbBudgets || []).map(b => {
@@ -122,13 +185,30 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Budgeted reflects the snapshot for the target month. For the current
+    // month, fall back to the budget's current amount (snapshot is lazily
+    // created below). For a past month with no snapshot the budget did not
+    // exist yet, so its budget is unknown.
+    const snap = targetSnapshotByBudget[b.id]
+    let budgeted: number
+    let budgetKnown = true
+    if (snap != null) {
+      budgeted = snap
+    } else if (isCurrentMonth) {
+      budgeted = Number(b.amount)
+    } else {
+      budgeted = 0
+      budgetKnown = false
+    }
+
     return {
       id: b.id,
       categoryId,
       subcategoryId,
       name: cat?.name || '',
       type: b.type,
-      budgeted: Number(b.amount),
+      budgeted,
+      budgetKnown,
       spent: Math.round(spent * 100) / 100,
       isCategory: !isChild,
       linkedGoalId: b.linked_goal_id || undefined,
@@ -174,55 +254,74 @@ export async function GET(request: NextRequest) {
     date: c.date,
   }))
 
-  // 6. Build summary
+  // 6. Build summary — Total Spent is ALL expenses for the month (USD),
+  // independent of whether a budget exists for the category.
   const totalBudgeted = budgets.reduce((sum, b) => sum + b.budgeted, 0)
-  const totalSpent = budgets.reduce((sum, b) => sum + b.spent, 0)
+  const totalSpent =
+    Math.round(
+      (monthTransactions || [])
+        .filter(t => !(t.category_id && excludedCategoryIds.has(t.category_id)))
+        .reduce((sum, t) => sum + usd(t.amount, t.from_account_id), 0) * 100
+    ) / 100
 
-  // 7. Build monthly history (last 12 months)
+  // 6b. Per-category spending for the month (every category, not just budgeted
+  // ones), with subcategory breakdown — drives the breakdown list below the chart.
+  const categorySpending = parentCategories
+    .map(parent => {
+      const subcategories = childCategories
+        .filter(c => c.parent_id === parent.id)
+        .map(c => ({ id: c.id, name: c.name, spent: Math.round((spentByCategory[c.id] || 0) * 100) / 100 }))
+        .filter(s => s.spent > 0)
+        .sort((a, b) => b.spent - a.spent)
+      const directSpent = spentByCategory[parent.id] || 0
+      const total = directSpent + subcategories.reduce((s, c) => s + c.spent, 0)
+      return {
+        id: parent.id,
+        name: parent.name,
+        spent: Math.round(total * 100) / 100,
+        subcategories,
+      }
+    })
+    .sort((a, b) => b.spent - a.spent)
+
+  // 7. Build monthly history spanning the full window (earliest tx → target month)
   const monthlyHistory: { month: string; budgeted: number; spent: number }[] = []
-  for (let i = 11; i >= 0; i--) {
+  const historyMonths =
+    (targetYear - historyStart.getFullYear()) * 12 +
+    (targetMonth - 1 - historyStart.getMonth()) +
+    1
+  for (let i = historyMonths - 1; i >= 0; i--) {
     const histDate = new Date(targetYear, targetMonth - 1 - i, 1)
-    const histMonthStart = `${histDate.getFullYear()}-${String(histDate.getMonth() + 1).padStart(2, '0')}-01`
     const histLabel = histDate.toLocaleString('en-US', { month: 'short', year: 'numeric' })
     monthlyHistory.push({ month: histLabel, budgeted: 0, spent: 0 })
-
-    // We'll fill these from snapshots and transaction aggregates below
-    void histMonthStart // used in batch queries below
   }
 
-  // Fetch snapshots for last 12 months
-  const historyStart = new Date(targetYear, targetMonth - 12, 1)
-  const historyStartStr = `${historyStart.getFullYear()}-${String(historyStart.getMonth() + 1).padStart(2, '0')}-01`
-
-  const { data: snapshots } = await supabase
-    .from('budget_monthly_snapshots')
-    .select('month, budgeted_amount')
-    .eq('user_id', user.id)
-    .gte('month', historyStartStr)
-    .lt('month', monthEnd)
-
-  // Aggregate snapshots by month
-  const snapshotsByMonth: Record<string, number> = {}
-  for (const s of snapshots || []) {
-    const sDate = new Date(s.month)
-    const key = sDate.toLocaleString('en-US', { month: 'short', year: 'numeric' })
-    snapshotsByMonth[key] = (snapshotsByMonth[key] || 0) + Number(s.budgeted_amount)
+  // Fetch expense transactions across the full history window (with category for
+  // averages). Paginate past PostgREST's max-rows cap so multi-year histories
+  // aggregate fully instead of silently truncating to the oldest page.
+  const histTransactions: { date: string; amount: number | string; category_id: string | null; from_account_id: string | null }[] = []
+  const PAGE_SIZE = 1000
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data: page } = await supabase
+      .from('transactions')
+      .select('date, amount, category_id, from_account_id')
+      .eq('user_id', user.id)
+      .eq('type', 'expense')
+      .gte('date', historyStartStr)
+      .lt('date', monthEnd)
+      .order('date', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1)
+    if (!page || page.length === 0) break
+    histTransactions.push(...page)
+    if (page.length < PAGE_SIZE) break
   }
-
-  // Fetch transaction aggregates for last 12 months
-  const { data: histTransactions } = await supabase
-    .from('transactions')
-    .select('date, amount')
-    .eq('user_id', user.id)
-    .eq('type', 'expense')
-    .gte('date', historyStartStr)
-    .lt('date', monthEnd)
 
   const spentByMonth: Record<string, number> = {}
   for (const t of histTransactions || []) {
+    if (t.category_id && excludedCategoryIds.has(t.category_id)) continue
     const tDate = new Date(t.date)
     const key = tDate.toLocaleString('en-US', { month: 'short', year: 'numeric' })
-    spentByMonth[key] = (spentByMonth[key] || 0) + Number(t.amount)
+    spentByMonth[key] = (spentByMonth[key] || 0) + usd(t.amount, t.from_account_id)
   }
 
   for (const entry of monthlyHistory) {
@@ -230,9 +329,30 @@ export async function GET(request: NextRequest) {
     entry.spent = Math.round((spentByMonth[entry.month] || 0) * 100) / 100
   }
 
-  // 8. Lazy-init snapshots for current month if missing
-  const currentMonthSnapshots = (snapshots || []).filter(s => s.month === monthStart)
-  if (currentMonthSnapshots.length === 0 && (dbBudgets || []).length > 0) {
+  // 7b. Trailing-12-month average monthly spend per category (for budget suggestions)
+  const twelveStart = new Date(targetYear, targetMonth - 12, 1)
+  const twelveStartStr = `${twelveStart.getFullYear()}-${String(twelveStart.getMonth() + 1).padStart(2, '0')}-01`
+  const avgTotals: Record<string, number> = {}
+  const monthsWithData = new Set<string>()
+  for (const t of histTransactions || []) {
+    if (t.date < twelveStartStr) continue
+    const cid = t.category_id
+    if (cid && excludedCategoryIds.has(cid)) continue
+    monthsWithData.add(new Date(t.date).toLocaleString('en-US', { month: 'short', year: 'numeric' }))
+    if (!cid) continue
+    const amt = usd(t.amount, t.from_account_id)
+    avgTotals[cid] = (avgTotals[cid] || 0) + amt
+    const parent = childToParent[cid]
+    if (parent) avgTotals[parent] = (avgTotals[parent] || 0) + amt
+  }
+  const monthsCovered = Math.min(12, Math.max(1, monthsWithData.size))
+  const categoryAverages: Record<string, number> = {}
+  for (const [cid, total] of Object.entries(avgTotals)) {
+    categoryAverages[cid] = Math.round((total / monthsCovered) * 100) / 100
+  }
+
+  // 8. Lazy-init snapshots for the current month if missing
+  if (isCurrentMonth && Object.keys(targetSnapshotByBudget).length === 0 && (dbBudgets || []).length > 0) {
     const snapshotRows = (dbBudgets || []).map(b => ({
       budget_id: b.id,
       user_id: user.id,
@@ -269,7 +389,7 @@ export async function GET(request: NextRequest) {
   const { data: recentTransactions } = await supabase
     .from('transactions')
     .select(`
-      id, date, description, amount, category_id,
+      id, date, description, amount, category_id, from_account_id,
       from_account:accounts!transactions_from_account_id_fkey(name),
       merchant:merchants(name)
     `)
@@ -280,7 +400,9 @@ export async function GET(request: NextRequest) {
     .order('date', { ascending: false })
     .limit(50)
 
-  const transactions = (recentTransactions || []).map(t => {
+  const transactions = (recentTransactions || [])
+    .filter(t => !(t.category_id && excludedCategoryIds.has(t.category_id)))
+    .map(t => {
     const catId = t.category_id || ''
     const parentId = childToParent[catId]
     return {
@@ -288,7 +410,7 @@ export async function GET(request: NextRequest) {
       date: t.date,
       description: t.description,
       merchantName: (t.merchant as unknown as { name: string } | null)?.name || null,
-      amount: Number(t.amount),
+      amount: usd(t.amount, t.from_account_id),
       categoryId: parentId || catId,
       subcategoryId: parentId ? catId : null,
       accountName: (t.from_account as unknown as { name: string } | null)?.name || '',
@@ -302,6 +424,8 @@ export async function GET(request: NextRequest) {
     summary: { totalBudgeted, totalSpent, month: monthLabel },
     monthlyHistory,
     categories,
+    categoryAverages,
+    categorySpending,
     savingsAccounts,
     transactions,
   })

@@ -21,6 +21,8 @@ export interface Budget {
   type: 'monthly' | 'sinking_fund'
   budgeted: number
   spent: number
+  /** False when viewing a past month in which this budget did not yet exist */
+  budgetKnown?: boolean
   isCategory: boolean
   /** For sinking funds: reference to the linked Goal */
   linkedGoalId?: string
@@ -65,6 +67,19 @@ export interface MonthlyHistoryEntry {
   spent: number
 }
 
+export interface CategorySpendingSub {
+  id: string
+  name: string
+  spent: number
+}
+
+export interface CategorySpending {
+  id: string
+  name: string
+  spent: number
+  subcategories: CategorySpendingSub[]
+}
+
 export interface Transaction {
   id: string
   date: string
@@ -102,7 +117,7 @@ export interface FilterState {
 // Time Range Types
 // =============================================================================
 
-export type TimeRange = '6months' | '12months'
+export type TimeRange = '6months' | '12months' | 'all'
 
 // =============================================================================
 // Component Props
@@ -137,6 +152,15 @@ export interface BudgetsProps {
   /** Historical spending data for the line graph */
   monthlyHistory: MonthlyHistoryEntry[]
 
+  /** Trailing-12-month average monthly spend, keyed by category/subcategory id */
+  categoryAverages?: Record<string, number>
+
+  /** Per-category spending for the selected month (every category, not just budgeted) */
+  categorySpending?: CategorySpending[]
+
+  /** Currently selected month in YYYY-MM form */
+  selectedMonth?: string
+
   /** Transactions for the detail drawer */
   transactions: Transaction[]
 
@@ -170,6 +194,9 @@ export interface BudgetsProps {
 
   /** Called when user wants to archive a goal */
   onArchiveGoal?: (id: string) => void
+
+  /** Called when user navigates to a different month (YYYY-MM) */
+  onMonthChange?: (month: string) => void
 
   /** Called when user changes the time range for the graph */
   onTimeRangeChange?: (range: TimeRange) => void
@@ -224,6 +251,9 @@ export interface CreateBudgetModalProps {
 
   /** Available savings accounts for sinking fund creation */
   savingsAccounts: SavingsAccountOption[]
+
+  /** Trailing-12-month average monthly spend, keyed by category/subcategory id */
+  categoryAverages?: Record<string, number>
 
   /** Whether the modal is open */
   isOpen: boolean

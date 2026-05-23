@@ -4,6 +4,7 @@ import type { CreateBudgetModalProps } from './types'
 export function CreateBudgetModal({
   categories,
   savingsAccounts,
+  categoryAverages = {},
   isOpen,
   onClose,
   onCreateBudget,
@@ -13,12 +14,28 @@ export function CreateBudgetModal({
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null)
   const [amount, setAmount] = useState('')
+  const [amountTouched, setAmountTouched] = useState(false)
   const [targetAmount, setTargetAmount] = useState('')
   const [targetDate, setTargetDate] = useState('')
   const [goalName, setGoalName] = useState('')
   const [linkedAccountId, setLinkedAccountId] = useState('')
 
   const selectedCategory = categories.find(c => c.id === selectedCategoryId)
+
+  // Trailing-12-month average for a given category/subcategory selection
+  const avgFor = (categoryId: string, subcategoryId: string | null) => {
+    const id = subcategoryId ?? categoryId
+    const avg = id ? categoryAverages[id] : undefined
+    return avg && avg > 0 ? avg : null
+  }
+  const suggestedAmount = avgFor(selectedCategoryId, selectedSubcategoryId)
+
+  // Prefill the amount with the suggested average unless the user has edited it
+  const applySuggestion = (categoryId: string, subcategoryId: string | null) => {
+    if (amountTouched) return
+    const avg = avgFor(categoryId, subcategoryId)
+    setAmount(avg != null ? String(avg) : '')
+  }
 
   // Auto-calculate monthly contribution from target amount and target date
   const calculatedMonthly = useMemo(() => {
@@ -75,6 +92,7 @@ export function CreateBudgetModal({
     setSelectedCategoryId('')
     setSelectedSubcategoryId(null)
     setAmount('')
+    setAmountTouched(false)
     setTargetAmount('')
     setTargetDate('')
     setGoalName('')
@@ -166,6 +184,7 @@ export function CreateBudgetModal({
                 onChange={(e) => {
                   setSelectedCategoryId(e.target.value)
                   setSelectedSubcategoryId(null)
+                  applySuggestion(e.target.value, null)
                 }}
                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 required
@@ -185,7 +204,11 @@ export function CreateBudgetModal({
                 </label>
                 <select
                   value={selectedSubcategoryId ?? ''}
-                  onChange={(e) => setSelectedSubcategoryId(e.target.value || null)}
+                  onChange={(e) => {
+                    const sub = e.target.value || null
+                    setSelectedSubcategoryId(sub)
+                    applySuggestion(selectedCategoryId, sub)
+                  }}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <option value="">Budget entire category</option>
@@ -207,7 +230,10 @@ export function CreateBudgetModal({
                   <input
                     type="number"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => {
+                      setAmountTouched(true)
+                      setAmount(e.target.value)
+                    }}
                     placeholder="0.00"
                     step="0.01"
                     min="0"
@@ -215,6 +241,14 @@ export function CreateBudgetModal({
                     required
                   />
                 </div>
+                {suggestedAmount != null && (
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    Avg last 12 mo:{' '}
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      ${suggestedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </p>
+                )}
               </div>
             )}
 
