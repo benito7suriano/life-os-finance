@@ -17,9 +17,16 @@ export interface User {
 // Account Types
 // =============================================================================
 
-export type AccountType = 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet'
-export type Currency = 'USD' | 'EUR' | 'GBP' | string
+export type AccountType = 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet' | 'investment'
+export type Currency = 'USD' | 'EUR' | 'GBP' | 'DOP' | string
 export type PaymentFrequency = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annually'
+export type AssetClass =
+  | 'investment_fund'
+  | 'business'
+  | 'pension'
+  | 'retirement'
+  | 'real_estate'
+  | 'vehicle'
 
 interface BaseAccount {
   id: string
@@ -81,19 +88,27 @@ export interface WalletAccount extends BaseAccount {
   currency: Currency
 }
 
+export interface InvestmentAccount extends BaseAccount {
+  type: 'investment'
+  assetClass: AssetClass
+  currency: Currency
+  institutionId?: string
+}
+
 export type Account =
   | CheckingAccount
   | SavingsAccount
   | CreditCardAccount
   | LoanAccount
   | WalletAccount
+  | InvestmentAccount
 
 // =============================================================================
 // Transaction Types
 // =============================================================================
 
 export type TransactionType = 'expense' | 'income' | 'transfer'
-export type TransactionSource = 'manual' | 'whatsapp' | 'email'
+export type TransactionSource = 'manual' | 'whatsapp' | 'email' | 'import'
 
 export interface Transaction {
   id: string
@@ -108,6 +123,8 @@ export interface Transaction {
   merchantId?: string
   goalId?: string
   source: TransactionSource
+  toAmount?: number
+  toCurrency?: Currency
   createdAt: string
   updatedAt: string
 }

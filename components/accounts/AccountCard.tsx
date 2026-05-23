@@ -1,4 +1,5 @@
 import type { Account, AccountCardProps } from './types'
+import { formatCurrency } from '@/lib/fx'
 import {
   Building2,
   CreditCard,
@@ -16,20 +17,12 @@ const typeIcons = {
   credit_card: CreditCard,
   loan: Building2,
   wallet: Wallet,
+  investment: TrendingUp,
 }
 
-function formatCurrency(amount: number): string {
-  const absAmount = Math.abs(amount)
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(absAmount)
-}
-
-function formatBalanceChange(change: number): string {
+function formatBalanceChange(change: number, currency: string = 'USD'): string {
   const prefix = change > 0 ? '+' : change < 0 ? '-' : ''
-  return `${prefix}${formatCurrency(Math.abs(change))}`
+  return `${prefix}${formatCurrency(Math.abs(change), currency)}`
 }
 
 function getInstitutionOrProvider(account: Account): string | null {
@@ -37,6 +30,7 @@ function getInstitutionOrProvider(account: Account): string | null {
     case 'checking':
     case 'savings':
     case 'loan':
+    case 'investment':
       return account.institutionName || null
     case 'credit_card':
       return account.institutionName || account.providerName
@@ -45,11 +39,16 @@ function getInstitutionOrProvider(account: Account): string | null {
   }
 }
 
+function getAccountCurrency(account: Account): string {
+  if ('currency' in account && account.currency) return account.currency
+  return 'USD'
+}
+
 export function AccountCard({ account, onClick }: AccountCardProps) {
   const Icon = typeIcons[account.type]
   const institution = getInstitutionOrProvider(account)
-  const isDebt = account.type === 'credit_card' || account.type === 'loan'
-  const displayBalance = isDebt ? Math.abs(account.balance) : account.balance
+  // Signed balance: negative = debt/overdraft (red, parentheses), positive = asset/credit.
+  const isNegative = account.balance < 0
   const balanceChange = account.balanceChange
   const isArchived = !!account.deletedAt
 
@@ -104,11 +103,11 @@ export function AccountCard({ account, onClick }: AccountCardProps) {
       {/* Balance */}
       <div className="mb-3">
         <p className={`text-2xl font-bold tracking-tight ${
-          isDebt
+          isNegative
             ? 'text-rose-600 dark:text-rose-400'
             : 'text-slate-900 dark:text-white'
         }`}>
-          {isDebt && '-'}{formatCurrency(displayBalance)}
+          {formatCurrency(account.balance, getAccountCurrency(account), { accounting: true })}
         </p>
       </div>
 
@@ -118,14 +117,14 @@ export function AccountCard({ account, onClick }: AccountCardProps) {
           <>
             <TrendingUp className="w-4 h-4 text-emerald-500" />
             <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-              {formatBalanceChange(balanceChange)}
+              {formatBalanceChange(balanceChange, getAccountCurrency(account))}
             </span>
           </>
         ) : balanceChange < 0 ? (
           <>
             <TrendingDown className="w-4 h-4 text-rose-500" />
             <span className="text-sm font-medium text-rose-600 dark:text-rose-400">
-              {formatBalanceChange(balanceChange)}
+              {formatBalanceChange(balanceChange, getAccountCurrency(account))}
             </span>
           </>
         ) : (

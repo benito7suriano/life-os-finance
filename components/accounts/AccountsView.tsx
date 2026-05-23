@@ -8,6 +8,7 @@ import type {
 } from './types'
 import { AccountCard } from './AccountCard'
 import { AccountDrawer } from './AccountDrawer'
+import { toUsd, formatCurrency } from '@/lib/fx'
 import {
   Plus,
   Landmark,
@@ -24,6 +25,8 @@ type AccountCategory = {
   icon: React.ElementType
 }
 
+// NOTE: `investment` accounts are intentionally NOT shown here — they remain in
+// the database and will get a dedicated assets page later.
 const categories: AccountCategory[] = [
   { key: ['checking', 'savings'], label: 'Bank Accounts', icon: Landmark },
   { key: ['credit_card'], label: 'Credit Cards', icon: CreditCard },
@@ -31,12 +34,14 @@ const categories: AccountCategory[] = [
   { key: ['wallet'], label: 'Wallet / Cash', icon: Wallet },
 ]
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(amount)
+/** Account's native currency, defaulting to USD when absent (e.g. older rows). */
+function accountCurrency(account: Account): string {
+  return 'currency' in account && account.currency ? account.currency : 'USD'
+}
+
+/** Sum a set of accounts in USD, converting each from its native currency. */
+function sumUsd(accounts: Account[]): number {
+  return accounts.reduce((sum, acc) => sum + toUsd(Number(acc.balance), accountCurrency(acc)), 0)
 }
 
 function groupAccountsByCategory(accounts: Account[]): Map<string, Account[]> {
@@ -52,10 +57,6 @@ function groupAccountsByCategory(accounts: Account[]): Map<string, Account[]> {
   }
 
   return grouped
-}
-
-function calculateTotalBalance(accounts: Account[]): number {
-  return accounts.reduce((sum, acc) => sum + acc.balance, 0)
 }
 
 function countAccountsByType(accounts: Account[]): { label: string; count: number }[] {
@@ -93,7 +94,11 @@ export function AccountsView({
   const [selectedAccount, setSelectedAccount] = useState<Account | undefined>()
 
   const groupedAccounts = groupAccountsByCategory(accounts)
-  const totalBalance = calculateTotalBalance(accounts)
+  // Headline = cash-only (bank + wallet − credit/loan), USD-converted.
+  // Investment accounts are excluded from the Accounts page entirely (kept in DB
+  // for a future dedicated assets page).
+  const cashAccounts = accounts.filter((acc) => acc.type !== 'investment')
+  const cashTotalUsd = sumUsd(cashAccounts)
   const accountCounts = countAccountsByType(accounts)
   const netWorthChange = accounts.reduce((sum, acc) => sum + acc.balanceChange, 0)
 
@@ -174,10 +179,10 @@ export function AccountsView({
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
               <p className="text-emerald-100 text-sm font-medium mb-1">
-                Total Balance
+                Cash Balance (USD)
               </p>
               <p className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-                {formatCurrency(totalBalance)}
+                {formatCurrency(cashTotalUsd, 'USD', { accounting: true })}
               </p>
             </div>
 
@@ -234,6 +239,9 @@ export function AccountsView({
                 </h2>
                 <span className="text-sm text-slate-400 dark:text-slate-500">
                   ({categoryAccounts.length})
+                </span>
+                <span className="ml-auto text-sm font-medium text-slate-500 dark:text-slate-400">
+                  {formatCurrency(sumUsd(categoryAccounts), 'USD', { accounting: true })}
                 </span>
               </div>
 

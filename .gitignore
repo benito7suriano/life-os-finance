@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase CLI scratch
+supabase/.temp/
+
+# Money Pro import: generated personal-data artifacts (regenerable from the
+# source CSVs via scripts/import/money-pro/01-consolidate.ts). Keep the scripts
+# and mappings, but never commit the raw transaction dumps.
+scripts/import/money-pro/data/
+
+# Verified account balances live in a local-only file — never commit balances.
+scripts/import/money-pro/mappings/balances.local.json

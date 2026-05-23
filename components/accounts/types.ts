@@ -17,7 +17,15 @@ export interface CreditCardProvider {
 // Account Types
 // =============================================================================
 
-export type AccountType = 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet'
+export type AccountType = 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet' | 'investment'
+
+export type AssetClass =
+  | 'investment_fund'
+  | 'business'
+  | 'pension'
+  | 'retirement'
+  | 'real_estate'
+  | 'vehicle'
 
 export type Currency = 'USD' | 'EUR' | 'GBP' | string
 
@@ -92,6 +100,7 @@ export interface CreditCardAccount extends BaseAccount {
   paymentDate: number
   interestRate: number
   creditLimit: number
+  currency: Currency
 }
 
 /** Loan account - tracks debt with payment schedule */
@@ -108,6 +117,7 @@ export interface LoanAccount extends BaseAccount {
   termMonths: number
   originationDate?: string
   maturityDate: string
+  currency: Currency
 }
 
 /** Wallet/cash account - physical cash on hand */
@@ -117,6 +127,14 @@ export interface WalletAccount extends BaseAccount {
   currency: Currency
 }
 
+export interface InvestmentAccount extends BaseAccount {
+  type: 'investment'
+  assetClass: AssetClass
+  currency: Currency
+  institutionId?: string | null
+  institutionName?: string | null
+}
+
 /** Union type for all account types */
 export type Account =
   | CheckingAccount
@@ -124,6 +142,7 @@ export type Account =
   | CreditCardAccount
   | LoanAccount
   | WalletAccount
+  | InvestmentAccount
 
 // =============================================================================
 // Summary Types

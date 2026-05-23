@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import type { Transaction, Category, Account } from './types'
-import { MoreHorizontal, Pencil, Trash2, MessageCircle, Mail, Edit3 } from 'lucide-react'
+import { MoreHorizontal, Pencil, Trash2, MessageCircle, Mail, Edit3, Upload } from 'lucide-react'
 
 interface TransactionRowProps {
   transaction: Transaction
@@ -44,16 +44,18 @@ const categoryColorMap: Record<string, { bg: string; text: string }> = {
   indigo: { bg: 'bg-indigo-100 dark:bg-indigo-900/40', text: 'text-indigo-700 dark:text-indigo-400' },
 }
 
-const sourceIcons = {
+const sourceIcons: Record<string, typeof Edit3> = {
   manual: Edit3,
   whatsapp: MessageCircle,
   email: Mail,
+  import: Upload,
 }
 
-const sourceLabels = {
+const sourceLabels: Record<string, string> = {
   manual: 'Manual',
   whatsapp: 'WhatsApp',
   email: 'Email',
+  import: 'Imported',
 }
 
 export function TransactionRow({
@@ -79,7 +81,7 @@ export function TransactionRow({
 
   const isIncome = transaction.amount > 0
   const colorClasses = categoryColorMap[category.color] || categoryColorMap.emerald
-  const SourceIcon = sourceIcons[transaction.source]
+  const SourceIcon = sourceIcons[transaction.source] ?? Edit3
 
   return (
     <tr className="group border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-700/50 dark:hover:bg-slate-800/50">
@@ -96,7 +98,7 @@ export function TransactionRow({
           </p>
           <div
             className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-slate-400 opacity-0 transition-opacity group-hover:opacity-100"
-            title={`Source: ${sourceLabels[transaction.source]}`}
+            title={`Source: ${sourceLabels[transaction.source] ?? transaction.source}`}
           >
             <SourceIcon className="h-3.5 w-3.5" />
           </div>

@@ -1,0 +1,618 @@
+[
+  {
+    "sourceName": "Agua",
+    "parent": "Agua",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Bills & Utilities"
+  },
+  {
+    "sourceName": "Banking",
+    "parent": "Banking",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "Bash",
+    "parent": "Personal",
+    "child": "Party",
+    "type": "expense",
+    "systemParent": "Personal"
+  },
+  {
+    "sourceName": "Carro: Gas",
+    "parent": "Carro",
+    "child": "Gas",
+    "type": "expense",
+    "systemParent": "Auto & Transportation"
+  },
+  {
+    "sourceName": "Carro: Lavado de carro",
+    "parent": "Carro",
+    "child": "Lavado de carro",
+    "type": "expense",
+    "systemParent": "Auto & Transportation"
+  },
+  {
+    "sourceName": "Carro: Llantas",
+    "parent": "Carro",
+    "child": "Llantas",
+    "type": "expense",
+    "systemParent": "Auto & Transportation"
+  },
+  {
+    "sourceName": "Carro: Mantenimiento",
+    "parent": "Carro",
+    "child": "Mantenimiento",
+    "type": "expense",
+    "systemParent": "Auto & Transportation"
+  },
+  {
+    "sourceName": "Carro: Marbete",
+    "parent": "Carro",
+    "child": "Marbete",
+    "type": "expense",
+    "systemParent": "Auto & Transportation"
+  },
+  {
+    "sourceName": "Carro: Multas",
+    "parent": "Carro",
+    "child": "Multas",
+    "type": "expense",
+    "systemParent": "Auto & Transportation"
+  },
+  {
+    "sourceName": "Carro: Parqueo",
+    "parent": "Carro",
+    "child": "Parqueo",
+    "type": "expense",
+    "systemParent": "Auto & Transportation"
+  },
+  {
+    "sourceName": "Carro: Peajes",
+    "parent": "Carro",
+    "child": "Peajes",
+    "type": "expense",
+    "systemParent": "Auto & Transportation"
+  },
+  {
+    "sourceName": "Carro: Seguro de carro",
+    "parent": "Carro",
+    "child": "Seguro de carro",
+    "type": "expense",
+    "systemParent": "Auto & Transportation"
+  },
+  {
+    "sourceName": "Casa: D28 - 303",
+    "parent": "Casa",
+    "child": "D28 - 303",
+    "type": "expense",
+    "systemParent": "Housing"
+  },
+  {
+    "sourceName": "Casa: D28 - 604",
+    "parent": "Casa",
+    "child": "D28 - 604",
+    "type": "expense",
+    "systemParent": "Housing"
+  },
+  {
+    "sourceName": "Casa: Home stuff",
+    "parent": "Casa",
+    "child": "Home stuff",
+    "type": "expense",
+    "systemParent": "Housing"
+  },
+  {
+    "sourceName": "Casa: Jardinería",
+    "parent": "Casa",
+    "child": "Jardinería",
+    "type": "expense",
+    "systemParent": "Housing"
+  },
+  {
+    "sourceName": "Casa: Mantenimientos",
+    "parent": "Casa",
+    "child": "Mantenimientos",
+    "type": "expense",
+    "systemParent": "Housing"
+  },
+  {
+    "sourceName": "Casa: Mobiliario d28",
+    "parent": "Casa",
+    "child": "Mobiliario d28",
+    "type": "expense",
+    "systemParent": "Housing"
+  },
+  {
+    "sourceName": "Casa: Sky01",
+    "parent": "Casa",
+    "child": "Sky01",
+    "type": "expense",
+    "systemParent": "Housing"
+  },
+  {
+    "sourceName": "Clothing: Clothing",
+    "parent": "Clothing",
+    "child": "Clothing",
+    "type": "expense",
+    "systemParent": "Shopping"
+  },
+  {
+    "sourceName": "Clothing: Dry-cleaning",
+    "parent": "Clothing",
+    "child": "Dry-cleaning",
+    "type": "expense",
+    "systemParent": "Shopping"
+  },
+  {
+    "sourceName": "Dividend Income",
+    "parent": "Dividend Income",
+    "child": null,
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Docs",
+    "parent": "Personal",
+    "child": "Personal Documents",
+    "type": "expense",
+    "systemParent": "Personal"
+  },
+  {
+    "sourceName": "Dress",
+    "parent": "Dress",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Shopping"
+  },
+  {
+    "sourceName": "Electricidad",
+    "parent": "Electricidad",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Bills & Utilities"
+  },
+  {
+    "sourceName": "Electronics",
+    "parent": "Electronics",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Shopping"
+  },
+  {
+    "sourceName": "Family",
+    "parent": "Family",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "Favores",
+    "parent": "Favores",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "Ferromax: Ferromax 1",
+    "parent": "Ferromax",
+    "child": "Ferromax 1",
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Ferromax: Ferromax 2",
+    "parent": "Ferromax",
+    "child": "Ferromax 2",
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Gifts",
+    "parent": "Gifts",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "Giving",
+    "parent": "Giving",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "Health: Cuidado dental",
+    "parent": "Health",
+    "child": "Cuidado dental",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Health: Fisio",
+    "parent": "Health",
+    "child": "Fisio",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Health: Gym accessories",
+    "parent": "Health",
+    "child": "Gym accessories",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Health: Masajes",
+    "parent": "Health",
+    "child": "Masajes",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Health: Medicinas",
+    "parent": "Health",
+    "child": "Medicinas",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Health: Odontólogo",
+    "parent": "Health",
+    "child": "Odontólogo",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Health: Tests",
+    "parent": "Health",
+    "child": "Tests",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Housekeeping",
+    "parent": "Housekeeping",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Housing"
+  },
+  {
+    "sourceName": "Interest Income",
+    "parent": "Interest Income",
+    "child": null,
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Internet",
+    "parent": "Internet",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Bills & Utilities"
+  },
+  {
+    "sourceName": "Investing",
+    "parent": "Investing",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "Jewelry",
+    "parent": "Jewelry",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Shopping"
+  },
+  {
+    "sourceName": "Learning",
+    "parent": "Learning",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "Lifestyle: Coffee and snacks",
+    "parent": "Lifestyle",
+    "child": "Coffee and snacks",
+    "type": "expense",
+    "systemParent": "Travel & Lifestyle"
+  },
+  {
+    "sourceName": "Lifestyle: Eating Out",
+    "parent": "Lifestyle",
+    "child": "Eating Out",
+    "type": "expense",
+    "systemParent": "Travel & Lifestyle"
+  },
+  {
+    "sourceName": "Lifestyle: Entertainment",
+    "parent": "Lifestyle",
+    "child": "Entertainment",
+    "type": "expense",
+    "systemParent": "Travel & Lifestyle"
+  },
+  {
+    "sourceName": "Lifestyle: Movies",
+    "parent": "Lifestyle",
+    "child": "Movies",
+    "type": "expense",
+    "systemParent": "Travel & Lifestyle"
+  },
+  {
+    "sourceName": "Lifestyle: Trips",
+    "parent": "Lifestyle",
+    "child": "Trips",
+    "type": "expense",
+    "systemParent": "Travel & Lifestyle"
+  },
+  {
+    "sourceName": "Market",
+    "parent": "Home",
+    "child": "Groceries",
+    "type": "expense",
+    "systemParent": "Home"
+  },
+  {
+    "sourceName": "Mia Valentina: Baby stuff",
+    "parent": "Suriano Siu Carpio Family",
+    "child": "Baby stuff",
+    "type": "expense",
+    "systemParent": "Suriano Siu Carpio Family"
+  },
+  {
+    "sourceName": "Mia Valentina: Bautizo",
+    "parent": "Suriano Siu Carpio Family",
+    "child": "Bautizo",
+    "type": "expense",
+    "systemParent": "Suriano Siu Carpio Family"
+  },
+  {
+    "sourceName": "Mia Valentina: Childcare",
+    "parent": "Suriano Siu Carpio Family",
+    "child": "Childcare",
+    "type": "expense",
+    "systemParent": "Suriano Siu Carpio Family"
+  },
+  {
+    "sourceName": "Mia Valentina: Eye Surgery",
+    "parent": "Suriano Siu Carpio Family",
+    "child": "Eye Surgery",
+    "type": "expense",
+    "systemParent": "Suriano Siu Carpio Family"
+  },
+  {
+    "sourceName": "Mia Valentina: Medicine",
+    "parent": "Suriano Siu Carpio Family",
+    "child": "Medicine",
+    "type": "expense",
+    "systemParent": "Suriano Siu Carpio Family"
+  },
+  {
+    "sourceName": "Mia Valentina: Vacunas",
+    "parent": "Suriano Siu Carpio Family",
+    "child": "Vacunas",
+    "type": "expense",
+    "systemParent": "Suriano Siu Carpio Family"
+  },
+  {
+    "sourceName": "Money exchange",
+    "parent": "Money exchange",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "Online services",
+    "parent": "Online services",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Bills & Utilities"
+  },
+  {
+    "sourceName": "Other",
+    "parent": "Other",
+    "child": null,
+    "type": "income",
+    "systemParent": null
+  },
+  {
+    "sourceName": "Padel RD: PaaS - COO",
+    "parent": "Padel RD",
+    "child": "PaaS - COO",
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Padel RD: Pádel - COO",
+    "parent": "Padel RD",
+    "child": "Pádel - COO",
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Padel RD: Pádel Coaching",
+    "parent": "Padel RD",
+    "child": "Pádel Coaching",
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Padel RD: Padel Oasis COO",
+    "parent": "Padel RD",
+    "child": "Padel Oasis COO",
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Padel RD: Padel X",
+    "parent": "Padel RD",
+    "child": "Padel X",
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Padel RD: Padel X Sale",
+    "parent": "Padel RD",
+    "child": "Padel X Sale",
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Personal Care",
+    "parent": "Personal Care",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Shopping"
+  },
+  {
+    "sourceName": "Préstamos",
+    "parent": "Préstamos",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "project-r",
+    "parent": "Suriano Siu Carpio Family",
+    "child": "Wedding Ring",
+    "type": "expense",
+    "systemParent": "Suriano Siu Carpio Family"
+  },
+  {
+    "sourceName": "Re payment",
+    "parent": "Re payment",
+    "child": null,
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Shipping",
+    "parent": "Shipping",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Shopping"
+  },
+  {
+    "sourceName": "Sky 01",
+    "parent": "Sky 01",
+    "child": null,
+    "type": "income",
+    "systemParent": "Income"
+  },
+  {
+    "sourceName": "Software",
+    "parent": "Software",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Bills & Utilities"
+  },
+  {
+    "sourceName": "Sports: Golf",
+    "parent": "Sports",
+    "child": "Golf",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Sports: Gym",
+    "parent": "Sports",
+    "child": "Gym",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Sports: Pádel",
+    "parent": "Sports",
+    "child": "Pádel",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Sports: Surf",
+    "parent": "Sports",
+    "child": "Surf",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Sports: Swimming",
+    "parent": "Sports",
+    "child": "Swimming",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Sports: Yoga / Outdoors",
+    "parent": "Sports",
+    "child": "Yoga / Outdoors",
+    "type": "expense",
+    "systemParent": "Health & Wellness"
+  },
+  {
+    "sourceName": "Tax",
+    "parent": "Tax",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "Travel",
+    "parent": "Travel",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Travel & Lifestyle"
+  },
+  {
+    "sourceName": "Uber",
+    "parent": "Uber",
+    "child": null,
+    "type": "expense",
+    "systemParent": "Auto & Transportation"
+  },
+  {
+    "sourceName": "Wedding",
+    "parent": "Suriano Siu Carpio Family",
+    "child": "Wedding",
+    "type": "expense",
+    "systemParent": "Suriano Siu Carpio Family"
+  },
+  {
+    "sourceName": "Work",
+    "parent": "Work",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "__balance_adjustment_expense__",
+    "parent": "Balance Adjustment",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "__balance_adjustment_income__",
+    "parent": "Balance Adjustment",
+    "child": null,
+    "type": "income",
+    "systemParent": null
+  },
+  {
+    "sourceName": "__asset_purchase__",
+    "parent": "Asset Purchase",
+    "child": null,
+    "type": "expense",
+    "systemParent": null
+  },
+  {
+    "sourceName": "__asset_sale__",
+    "parent": "Asset Sale",
+    "child": null,
+    "type": "income",
+    "systemParent": null
+  }
+]
