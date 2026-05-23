@@ -18,7 +18,16 @@ export function BudgetCard({ budget, goal, isCategory = false, onClick }: Budget
   let displayLabel = ''
   let secondaryLabel = ''
 
-  if (budget) {
+  const budgetUnknown = !!budget && budget.budgetKnown === false
+
+  if (budget && budgetUnknown) {
+    // Viewing a past month before this budget existed — show spend only.
+    spent = budget.spent
+    total = 0
+    progress = 0
+    displayLabel = `$${spent.toLocaleString('en-US', { minimumFractionDigits: 2 })} spent`
+    secondaryLabel = 'No budget set'
+  } else if (budget) {
     spent = budget.spent
     total = budget.budgeted
     progress = total > 0 ? (spent / total) * 100 : 0

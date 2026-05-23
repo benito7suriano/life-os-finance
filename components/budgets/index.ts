@@ -1,5 +1,6 @@
 export { BudgetsDashboard } from './BudgetsDashboard'
 export { BudgetCard } from './BudgetCard'
 export { SpendingChart } from './SpendingChart'
+export { CategorySpending } from './CategorySpending'
 export { BudgetDrawer } from './BudgetDrawer'
 export { CreateBudgetModal } from './CreateBudgetModal'

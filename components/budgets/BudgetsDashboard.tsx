@@ -9,6 +9,7 @@ import type {
   SortField,
 } from './types'
 import { SpendingChart } from './SpendingChart'
+import { CategorySpending } from './CategorySpending'
 import { BudgetCard } from './BudgetCard'
 import { BudgetDrawer } from './BudgetDrawer'
 import { CreateBudgetModal } from './CreateBudgetModal'
@@ -23,6 +24,9 @@ export function BudgetsDashboard({
   goalContributions,
   savingsAccounts,
   monthlyHistory,
+  categoryAverages,
+  categorySpending,
+  selectedMonth,
   transactions,
   onViewBudget,
   onEditBudget,
@@ -32,6 +36,7 @@ export function BudgetsDashboard({
   onViewGoal,
   onEditGoal,
   onArchiveGoal,
+  onMonthChange,
   onTimeRangeChange,
   onFilterChange,
 }: BudgetsProps) {
@@ -145,6 +150,19 @@ export function BudgetsDashboard({
     ? Math.round((summary.totalSpent / summary.totalBudgeted) * 100)
     : 0
 
+  // Month navigation (YYYY-MM)
+  const currentMonthStr = (() => {
+    const n = new Date()
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`
+  })()
+  const activeMonth = selectedMonth ?? currentMonthStr
+  const shiftMonth = (ym: string, delta: number) => {
+    const [y, m] = ym.split('-').map(Number)
+    const d = new Date(y, m - 1 + delta, 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  const canGoNext = activeMonth < currentMonthStr
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -154,9 +172,36 @@ export function BudgetsDashboard({
             <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
               Budgets
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              {summary.month}
-            </p>
+            {onMonthChange ? (
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  onClick={() => onMonthChange(shiftMonth(activeMonth, -1))}
+                  className="p-1 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  aria-label="Previous month"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-300 min-w-[8rem] text-center">
+                  {summary.month}
+                </span>
+                <button
+                  onClick={() => canGoNext && onMonthChange(shiftMonth(activeMonth, 1))}
+                  disabled={!canGoNext}
+                  className="p-1 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                  aria-label="Next month"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                {summary.month}
+              </p>
+            )}
           </div>
 
           <button
@@ -194,16 +239,22 @@ export function BudgetsDashboard({
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
               Remaining
             </p>
-            <p className={`text-2xl font-bold ${summary.totalBudgeted - summary.totalSpent < 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-              ${Math.abs(summary.totalBudgeted - summary.totalSpent).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              {summary.totalBudgeted - summary.totalSpent < 0 && ' over'}
-            </p>
-            <div className="mt-3 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${percentUsed > 100 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                style={{ width: `${Math.min(percentUsed, 100)}%` }}
-              />
-            </div>
+            {summary.totalBudgeted > 0 ? (
+              <>
+                <p className={`text-2xl font-bold ${summary.totalBudgeted - summary.totalSpent < 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                  ${Math.abs(summary.totalBudgeted - summary.totalSpent).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  {summary.totalBudgeted - summary.totalSpent < 0 && ' over'}
+                </p>
+                <div className="mt-3 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${percentUsed > 100 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                    style={{ width: `${Math.min(percentUsed, 100)}%` }}
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-2xl font-bold text-slate-400 dark:text-slate-500">—</p>
+            )}
           </div>
         </div>
 
@@ -214,6 +265,11 @@ export function BudgetsDashboard({
             timeRange={timeRange}
             onTimeRangeChange={handleTimeRangeChange}
           />
+        </div>
+
+        {/* Spending by Category (selected month) */}
+        <div className="mb-8">
+          <CategorySpending data={categorySpending ?? []} month={summary.month} />
         </div>
 
         {/* Filter Controls */}
@@ -317,6 +373,7 @@ export function BudgetsDashboard({
       <CreateBudgetModal
         categories={categories}
         savingsAccounts={savingsAccounts}
+        categoryAverages={categoryAverages}
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreateBudget={onCreateBudget}

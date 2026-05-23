@@ -4,6 +4,12 @@
     "totalSpent": 3124.67,
     "month": "January 2025"
   },
+  "categoryAverages": {
+    "cat-food": 712.34,
+    "sub-coffee": 88.2,
+    "cat-auto": 430.5,
+    "cat-bills": 365.0
+  },
   "categories": [
     {
       "id": "cat-auto",

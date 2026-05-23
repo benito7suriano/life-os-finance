@@ -113,7 +113,8 @@ export function restoreAccount(id: string) {
 
 // ── Budgets ─────────────────────────────────────────────────────────────────
 
-export function listBudgets() {
+export function listBudgets(month?: string) {
+  const query = month ? `?month=${encodeURIComponent(month)}` : ''
   return request<{
     budgets: unknown[]
     goals: unknown[]
@@ -121,9 +122,11 @@ export function listBudgets() {
     summary: { totalBudgeted: number; totalSpent: number; month: string }
     monthlyHistory: unknown[]
     categories: unknown[]
+    categoryAverages: Record<string, number>
+    categorySpending: unknown[]
     savingsAccounts: unknown[]
     transactions: unknown[]
-  }>(`/budgets`)
+  }>(`/budgets${query}`)
 }
 
 export function createBudget(input: Record<string, unknown>) {

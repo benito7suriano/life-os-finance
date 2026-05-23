@@ -18,6 +18,7 @@ import type {
   SavingsAccountOption,
   BudgetSummary,
   MonthlyHistoryEntry,
+  CategorySpending,
   Transaction,
 } from '@/components/budgets/types'
 
@@ -40,16 +41,24 @@ export default function BudgetsPage() {
   const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccountOption[]>([])
   const [summary, setSummary] = useState<BudgetSummary>(EMPTY_SUMMARY)
   const [monthlyHistory, setMonthlyHistory] = useState<MonthlyHistoryEntry[]>([])
+  const [categoryAverages, setCategoryAverages] = useState<Record<string, number>>({})
+  const [categorySpending, setCategorySpending] = useState<CategorySpending[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isAuthed, setIsAuthed] = useState(false)
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthIso)
 
-  const fetchBudgets = useCallback(async () => {
+  // Fetch all budget data from the API for a given month.
+  // When authenticated, the API response is authoritative — even an empty
+  // budget list is real data (renders the empty state + a real chart).
+  const fetchBudgets = useCallback(async (month: string) => {
     try {
-      const data = await listBudgets()
+      const data = await listBudgets(month)
       setBudgets((data.budgets || []) as Budget[])
       setGoals((data.goals || []) as Goal[])
       setGoalContributions((data.goalContributions || []) as GoalContribution[])
       setCategories((data.categories || []) as Category[])
+      setCategoryAverages((data.categoryAverages || {}) as Record<string, number>)
+      setCategorySpending((data.categorySpending || []) as CategorySpending[])
       setSavingsAccounts((data.savingsAccounts || []) as SavingsAccountOption[])
       setSummary((data.summary as BudgetSummary) ?? EMPTY_SUMMARY)
       setMonthlyHistory((data.monthlyHistory || []) as MonthlyHistoryEntry[])
@@ -59,6 +68,7 @@ export default function BudgetsPage() {
     }
   }, [])
 
+  // Check auth on mount.
   useEffect(() => {
     async function init() {
       const supabase = createClient()
@@ -70,9 +80,10 @@ export default function BudgetsPage() {
     init()
   }, [])
 
+  // Fetch when authenticated or the selected month changes.
   useEffect(() => {
-    if (isAuthed) fetchBudgets()
-  }, [isAuthed, fetchBudgets])
+    if (isAuthed) fetchBudgets(selectedMonth)
+  }, [isAuthed, selectedMonth, fetchBudgets])
 
   const handleCreateBudget = useCallback(
     async (budget: Omit<Budget, 'id' | 'spent' | 'linkedGoalId'>) => {
@@ -83,12 +94,12 @@ export default function BudgetsPage() {
           subcategoryId: budget.subcategoryId,
           amount: budget.budgeted,
         })
-        await fetchBudgets()
+        await fetchBudgets(selectedMonth)
       } catch (e) {
         console.error('[budgets] create failed', e)
       }
     },
-    [fetchBudgets]
+    [fetchBudgets, selectedMonth]
   )
 
   const handleCreateSinkingFund = useCallback(
@@ -110,36 +121,36 @@ export default function BudgetsPage() {
           targetDate: data.targetDate,
           linkedAccountId: data.linkedAccountId,
         })
-        await fetchBudgets()
+        await fetchBudgets(selectedMonth)
       } catch (e) {
         console.error('[budgets] create sinking fund failed', e)
       }
     },
-    [fetchBudgets]
+    [fetchBudgets, selectedMonth]
   )
 
   const handleEditBudget = useCallback(
     async (id: string, updates: Partial<Budget>) => {
       try {
         await updateBudget(id, { amount: updates.budgeted })
-        await fetchBudgets()
+        await fetchBudgets(selectedMonth)
       } catch (e) {
         console.error('[budgets] edit failed', e)
       }
     },
-    [fetchBudgets]
+    [fetchBudgets, selectedMonth]
   )
 
   const handleDeleteBudget = useCallback(
     async (id: string) => {
       try {
         await deleteBudget(id)
-        await fetchBudgets()
+        await fetchBudgets(selectedMonth)
       } catch (e) {
         console.error('[budgets] delete failed', e)
       }
     },
-    [fetchBudgets]
+    [fetchBudgets, selectedMonth]
   )
 
   const handleEditGoal = useCallback(
@@ -149,24 +160,24 @@ export default function BudgetsPage() {
           targetAmount: updates.targetAmount,
           targetDate: updates.targetDate,
         })
-        await fetchBudgets()
+        await fetchBudgets(selectedMonth)
       } catch (e) {
         console.error('[budgets] edit goal failed', e)
       }
     },
-    [fetchBudgets]
+    [fetchBudgets, selectedMonth]
   )
 
   const handleArchiveGoal = useCallback(
     async (id: string) => {
       try {
         await updateGoal(id, { status: 'archived' })
-        await fetchBudgets()
+        await fetchBudgets(selectedMonth)
       } catch (e) {
         console.error('[budgets] archive goal failed', e)
       }
     },
-    [fetchBudgets]
+    [fetchBudgets, selectedMonth]
   )
 
   return (
@@ -178,7 +189,11 @@ export default function BudgetsPage() {
       goalContributions={goalContributions}
       savingsAccounts={savingsAccounts}
       monthlyHistory={monthlyHistory}
+      categoryAverages={categoryAverages}
+      categorySpending={categorySpending}
+      selectedMonth={selectedMonth}
       transactions={transactions}
+      onMonthChange={setSelectedMonth}
       onCreateBudget={handleCreateBudget}
       onCreateSinkingFund={handleCreateSinkingFund}
       onEditBudget={handleEditBudget}

@@ -28,7 +28,8 @@ describe('BudgetsDashboard', () => {
 
     it('renders the month subtitle', () => {
       render(<BudgetsDashboard {...defaultProps} />)
-      expect(screen.getByText('January 2025')).toBeInTheDocument()
+      // Month appears in the header and the category-spending card header.
+      expect(screen.getAllByText('January 2025').length).toBeGreaterThan(0)
     })
 
     it('renders the Add Budget button', () => {
