@@ -18,9 +18,11 @@ export function SpendingChart({ data, timeRange, onTimeRangeChange }: SpendingCh
   const chartHeight = 200
   const chartPadding = { top: 20, right: 40, bottom: 40, left: 50 }
 
-  // Find max value for scaling
+  // Find max value for scaling. Floor at 1 so an all-zero window (fresh user,
+  // or a range with no snapshots/transactions yet) doesn't divide by zero in
+  // getY and emit NaN into SVG coordinates.
   const allValues = visibleData.flatMap(d => [d.budgeted, d.spent])
-  const maxValue = Math.max(...allValues) * 1.1
+  const maxValue = Math.max(...allValues, 1) * 1.1
 
   // Calculate positions
   const getX = (index: number) => {
