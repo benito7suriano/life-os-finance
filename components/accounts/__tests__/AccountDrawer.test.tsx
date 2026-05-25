@@ -215,9 +215,11 @@ describe('AccountDrawer', () => {
         institutionName: 'Banco Agrícola',
         accountNumber: '5555666677',
         balance: 15000.00,
+        balanceUsd: 15000.00,
         currency: 'USD',
         interestRate: 2.5,
         balanceChange: 500.00,
+        balanceChangeUsd: 500.00,
         linkedGoals: [
           {
             id: 'goal-001',
@@ -254,9 +256,11 @@ describe('AccountDrawer', () => {
         institutionName: 'Banco Agrícola',
         accountNumber: '5555666677',
         balance: 15000.00,
+        balanceUsd: 15000.00,
         currency: 'USD',
         interestRate: 2.5,
         balanceChange: 500.00,
+        balanceChangeUsd: 500.00,
         linkedGoals: [
           {
             id: 'goal-001',

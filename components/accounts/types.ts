@@ -36,9 +36,16 @@ interface BaseAccount {
   id: string
   type: AccountType
   name: string
+  /** Balance in the account's native currency — for display only. */
   balance: number
-  /** Change in balance over the current month (positive = increase, negative = decrease) */
+  /** Native currency of this account (e.g. 'USD', 'DOP'). */
+  currency: Currency
+  /** USD-converted balance, computed at the API boundary. Aggregate THIS, never `balance`. */
+  balanceUsd: number
+  /** Change in balance over the current month, native currency (positive = increase). */
   balanceChange: number
+  /** USD-converted month change. Aggregate THIS, never `balanceChange`. */
+  balanceChangeUsd: number
   /** ISO timestamp when soft-deleted, undefined if active */
   deletedAt?: string
 }

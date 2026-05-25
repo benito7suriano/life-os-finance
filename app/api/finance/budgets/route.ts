@@ -88,23 +88,15 @@ export async function GET(request: NextRequest) {
     dbContributions = data || []
   }
 
-  // Currency lookup per account — expense amounts are stored in the
-  // from-account's currency (DOP or USD) and must be converted to USD before
-  // they can be summed together.
-  const { data: allAccounts } = await supabase
-    .from('accounts')
-    .select('id, currency')
-    .eq('user_id', user.id)
-
-  const currencyByAccount = new Map<string, string>()
-  for (const a of allAccounts || []) currencyByAccount.set(a.id, a.currency || 'USD')
-  const usd = (amount: number | string, accountId: string | null) =>
-    toUsd(Number(amount), accountId ? currencyByAccount.get(accountId) ?? 'USD' : 'USD')
+  // Expense amounts are stored in the transaction's own `currency` (DOP or USD)
+  // and must be converted to USD before they can be summed together.
+  const usd = (amount: number | string, currency: string | null | undefined) =>
+    toUsd(Number(amount), currency)
 
   // 5. Compute spent per category for the month (in USD)
   const { data: monthTransactions } = await supabase
     .from('transactions')
-    .select('category_id, amount, from_account_id')
+    .select('category_id, amount, currency')
     .eq('user_id', user.id)
     .eq('type', 'expense')
     .gte('date', monthStart)
@@ -114,7 +106,7 @@ export async function GET(request: NextRequest) {
   const spentByCategory: Record<string, number> = {}
   for (const t of monthTransactions || []) {
     if (t.category_id && !excludedCategoryIds.has(t.category_id)) {
-      spentByCategory[t.category_id] = (spentByCategory[t.category_id] || 0) + usd(t.amount, t.from_account_id)
+      spentByCategory[t.category_id] = (spentByCategory[t.category_id] || 0) + usd(t.amount, t.currency)
     }
   }
 
@@ -261,7 +253,7 @@ export async function GET(request: NextRequest) {
     Math.round(
       (monthTransactions || [])
         .filter(t => !(t.category_id && excludedCategoryIds.has(t.category_id)))
-        .reduce((sum, t) => sum + usd(t.amount, t.from_account_id), 0) * 100
+        .reduce((sum, t) => sum + usd(t.amount, t.currency), 0) * 100
     ) / 100
 
   // 6b. Per-category spending for the month (every category, not just budgeted
@@ -299,12 +291,12 @@ export async function GET(request: NextRequest) {
   // Fetch expense transactions across the full history window (with category for
   // averages). Paginate past PostgREST's max-rows cap so multi-year histories
   // aggregate fully instead of silently truncating to the oldest page.
-  const histTransactions: { date: string; amount: number | string; category_id: string | null; from_account_id: string | null }[] = []
+  const histTransactions: { date: string; amount: number | string; category_id: string | null; currency: string | null }[] = []
   const PAGE_SIZE = 1000
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data: page } = await supabase
       .from('transactions')
-      .select('date, amount, category_id, from_account_id')
+      .select('date, amount, category_id, currency')
       .eq('user_id', user.id)
       .eq('type', 'expense')
       .gte('date', historyStartStr)
@@ -321,7 +313,7 @@ export async function GET(request: NextRequest) {
     if (t.category_id && excludedCategoryIds.has(t.category_id)) continue
     const tDate = new Date(t.date)
     const key = tDate.toLocaleString('en-US', { month: 'short', year: 'numeric' })
-    spentByMonth[key] = (spentByMonth[key] || 0) + usd(t.amount, t.from_account_id)
+    spentByMonth[key] = (spentByMonth[key] || 0) + usd(t.amount, t.currency)
   }
 
   for (const entry of monthlyHistory) {
@@ -340,7 +332,7 @@ export async function GET(request: NextRequest) {
     if (cid && excludedCategoryIds.has(cid)) continue
     monthsWithData.add(new Date(t.date).toLocaleString('en-US', { month: 'short', year: 'numeric' }))
     if (!cid) continue
-    const amt = usd(t.amount, t.from_account_id)
+    const amt = usd(t.amount, t.currency)
     avgTotals[cid] = (avgTotals[cid] || 0) + amt
     const parent = childToParent[cid]
     if (parent) avgTotals[parent] = (avgTotals[parent] || 0) + amt
@@ -389,7 +381,7 @@ export async function GET(request: NextRequest) {
   const { data: recentTransactions } = await supabase
     .from('transactions')
     .select(`
-      id, date, description, amount, category_id, from_account_id,
+      id, date, description, amount, currency, category_id, from_account_id,
       from_account:accounts!transactions_from_account_id_fkey(name),
       merchant:merchants(name)
     `)
@@ -410,7 +402,7 @@ export async function GET(request: NextRequest) {
       date: t.date,
       description: t.description,
       merchantName: (t.merchant as unknown as { name: string } | null)?.name || null,
-      amount: usd(t.amount, t.from_account_id),
+      amount: usd(t.amount, t.currency),
       categoryId: parentId || catId,
       subcategoryId: parentId ? catId : null,
       accountName: (t.from_account as unknown as { name: string } | null)?.name || '',

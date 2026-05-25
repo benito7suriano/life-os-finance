@@ -46,12 +46,40 @@ describe('AccountsView', () => {
   })
 
   // ---------------------------------------------------------------------------
+  // 1b. Combined balance is currency-normalized (regression: the $1M bug)
+  // ---------------------------------------------------------------------------
+  describe('Combined balance across currencies', () => {
+    // $1,000 USD + 59,000 DOP (= $1,000 at 59/USD). The headline must be the
+    // USD SUM ($2,000) — never the raw mixed-currency sum (60,000).
+    const mixedAccounts = [
+      {
+        id: 'usd-chk', type: 'checking', name: 'USD Checking',
+        beneficiaryName: 'Me', balance: 1000, currency: 'USD',
+        balanceUsd: 1000, balanceChange: 0, balanceChangeUsd: 0,
+      },
+      {
+        id: 'dop-chk', type: 'checking', name: 'DOP Checking',
+        beneficiaryName: 'Me', balance: 59000, currency: 'DOP',
+        balanceUsd: 1000, balanceChange: 0, balanceChangeUsd: 0,
+      },
+    ] as unknown as AccountsProps['accounts']
+
+    it('sums balanceUsd, not raw native balances', () => {
+      render(<AccountsView {...defaultProps} accounts={mixedAccounts} />)
+      // Headline + the "Bank Accounts" category total both read $2,000.00.
+      expect(screen.getAllByText('$2,000.00').length).toBeGreaterThan(0)
+      // The raw mixed-currency sum (1000 + 59000) must never appear.
+      expect(screen.queryByText('$60,000.00')).not.toBeInTheDocument()
+    })
+  })
+
+  // ---------------------------------------------------------------------------
   // 2. Summary Card
   // ---------------------------------------------------------------------------
   describe('Summary Card', () => {
-    it('displays the total balance label', () => {
+    it('displays the cash balance label', () => {
       render(<AccountsView {...defaultProps} />)
-      expect(screen.getByText('Total Balance')).toBeInTheDocument()
+      expect(screen.getByText('Cash Balance (USD)')).toBeInTheDocument()
     })
 
     it('displays account type counts', () => {
@@ -122,7 +150,7 @@ describe('AccountsView', () => {
 
     it('does not show summary card when accounts is empty', () => {
       render(<AccountsView {...defaultProps} accounts={[]} />)
-      expect(screen.queryByText('Total Balance')).not.toBeInTheDocument()
+      expect(screen.queryByText('Cash Balance (USD)')).not.toBeInTheDocument()
     })
   })
 

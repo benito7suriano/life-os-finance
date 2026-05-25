@@ -1,21 +1,91 @@
 {
   "categories": [
-    { "id": "cat-001", "name": "Salary", "color": "emerald", "type": "income" },
-    { "id": "cat-002", "name": "Freelance", "color": "teal", "type": "income" },
-    { "id": "cat-003", "name": "Groceries", "color": "amber", "type": "expense" },
-    { "id": "cat-004", "name": "Dining Out", "color": "orange", "type": "expense" },
-    { "id": "cat-005", "name": "Transportation", "color": "sky", "type": "expense" },
-    { "id": "cat-006", "name": "Utilities", "color": "violet", "type": "expense" },
-    { "id": "cat-007", "name": "Entertainment", "color": "pink", "type": "expense" },
-    { "id": "cat-008", "name": "Shopping", "color": "rose", "type": "expense" },
-    { "id": "cat-009", "name": "Health", "color": "red", "type": "expense" },
-    { "id": "cat-010", "name": "Subscriptions", "color": "indigo", "type": "expense" }
+    {
+      "id": "cat-001",
+      "name": "Salary",
+      "color": "emerald",
+      "type": "income"
+    },
+    {
+      "id": "cat-002",
+      "name": "Freelance",
+      "color": "teal",
+      "type": "income"
+    },
+    {
+      "id": "cat-003",
+      "name": "Groceries",
+      "color": "amber",
+      "type": "expense"
+    },
+    {
+      "id": "cat-004",
+      "name": "Dining Out",
+      "color": "orange",
+      "type": "expense"
+    },
+    {
+      "id": "cat-005",
+      "name": "Transportation",
+      "color": "sky",
+      "type": "expense"
+    },
+    {
+      "id": "cat-006",
+      "name": "Utilities",
+      "color": "violet",
+      "type": "expense"
+    },
+    {
+      "id": "cat-007",
+      "name": "Entertainment",
+      "color": "pink",
+      "type": "expense"
+    },
+    {
+      "id": "cat-008",
+      "name": "Shopping",
+      "color": "rose",
+      "type": "expense"
+    },
+    {
+      "id": "cat-009",
+      "name": "Health",
+      "color": "red",
+      "type": "expense"
+    },
+    {
+      "id": "cat-010",
+      "name": "Subscriptions",
+      "color": "indigo",
+      "type": "expense"
+    }
   ],
   "accounts": [
-    { "id": "acc-001", "name": "Main Checking", "type": "checking", "icon": "building-columns" },
-    { "id": "acc-002", "name": "Savings", "type": "savings", "icon": "piggy-bank" },
-    { "id": "acc-003", "name": "Visa Credit Card", "type": "credit_card", "icon": "credit-card" },
-    { "id": "acc-004", "name": "Cash Wallet", "type": "wallet", "icon": "wallet" }
+    {
+      "id": "acc-001",
+      "name": "Main Checking",
+      "type": "checking",
+      "icon": "building-columns"
+    },
+    {
+      "id": "acc-002",
+      "name": "Savings",
+      "type": "savings",
+      "icon": "piggy-bank"
+    },
+    {
+      "id": "acc-003",
+      "name": "Visa Credit Card",
+      "type": "credit_card",
+      "icon": "credit-card"
+    },
+    {
+      "id": "acc-004",
+      "name": "Cash Wallet",
+      "type": "wallet",
+      "icon": "wallet"
+    }
   ],
   "transactions": [
     {
@@ -24,9 +94,11 @@
       "description": "Monthly salary deposit",
       "categoryId": "cat-001",
       "accountId": "acc-001",
-      "amount": 4500.00,
+      "amount": 4500.0,
       "type": "income",
-      "source": "manual"
+      "source": "manual",
+      "currency": "USD",
+      "amountUsd": 4500.0
     },
     {
       "id": "txn-002",
@@ -36,7 +108,9 @@
       "accountId": "acc-003",
       "amount": -87.45,
       "type": "expense",
-      "source": "whatsapp"
+      "source": "whatsapp",
+      "currency": "USD",
+      "amountUsd": -87.45
     },
     {
       "id": "txn-003",
@@ -44,9 +118,11 @@
       "description": "Uber ride to downtown",
       "categoryId": "cat-005",
       "accountId": "acc-003",
-      "amount": -12.50,
+      "amount": -12.5,
       "type": "expense",
-      "source": "email"
+      "source": "email",
+      "currency": "USD",
+      "amountUsd": -12.5
     },
     {
       "id": "txn-004",
@@ -56,7 +132,9 @@
       "accountId": "acc-003",
       "amount": -15.99,
       "type": "expense",
-      "source": "email"
+      "source": "email",
+      "currency": "USD",
+      "amountUsd": -15.99
     },
     {
       "id": "txn-005",
@@ -64,9 +142,11 @@
       "description": "Dinner at La Pampa Grill",
       "categoryId": "cat-004",
       "accountId": "acc-003",
-      "amount": -156.80,
+      "amount": -156.8,
       "type": "expense",
-      "source": "whatsapp"
+      "source": "whatsapp",
+      "currency": "USD",
+      "amountUsd": -156.8
     },
     {
       "id": "txn-006",
@@ -74,9 +154,11 @@
       "description": "Freelance project payment",
       "categoryId": "cat-002",
       "accountId": "acc-001",
-      "amount": 350.00,
+      "amount": 350.0,
       "type": "income",
-      "source": "manual"
+      "source": "manual",
+      "currency": "USD",
+      "amountUsd": 350.0
     },
     {
       "id": "txn-007",
@@ -86,7 +168,9 @@
       "accountId": "acc-001",
       "amount": -78.32,
       "type": "expense",
-      "source": "email"
+      "source": "email",
+      "currency": "USD",
+      "amountUsd": -78.32
     },
     {
       "id": "txn-008",
@@ -96,7 +180,9 @@
       "accountId": "acc-004",
       "amount": -8.75,
       "type": "expense",
-      "source": "manual"
+      "source": "manual",
+      "currency": "USD",
+      "amountUsd": -8.75
     },
     {
       "id": "txn-009",
@@ -106,7 +192,9 @@
       "accountId": "acc-003",
       "amount": -89.99,
       "type": "expense",
-      "source": "email"
+      "source": "email",
+      "currency": "USD",
+      "amountUsd": -89.99
     },
     {
       "id": "txn-010",
@@ -114,15 +202,17 @@
       "description": "Gas station fill-up",
       "categoryId": "cat-005",
       "accountId": "acc-003",
-      "amount": -45.00,
+      "amount": -45.0,
       "type": "expense",
-      "source": "whatsapp"
+      "source": "whatsapp",
+      "currency": "USD",
+      "amountUsd": -45.0
     }
   ],
   "summary": {
     "count": 15,
-    "totalIncome": 9350.00,
-    "totalExpenses": 794.33
+    "totalIncomeUsd": 9350.0,
+    "totalExpensesUsd": 794.33
   },
   "goalsByAccount": [
     {
