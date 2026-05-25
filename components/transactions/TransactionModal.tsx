@@ -34,6 +34,9 @@ export function TransactionModal({
   const [accountId, setAccountId] = useState(editTransaction?.accountId || '')
   const [fromAccountId, setFromAccountId] = useState(editTransaction?.fromAccountId || '')
   const [toAccountId, setToAccountId] = useState(editTransaction?.toAccountId || '')
+  const [toAmount, setToAmount] = useState(
+    editTransaction?.toAmount != null ? String(editTransaction.toAmount) : ''
+  )
   const [contributeToGoals, setContributeToGoals] = useState(false)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('proportional')
   const [manualAllocations, setManualAllocations] = useState<Record<string, number>>({})
@@ -50,6 +53,7 @@ export function TransactionModal({
       setAccountId(editTransaction?.accountId || '')
       setFromAccountId(editTransaction?.fromAccountId || '')
       setToAccountId(editTransaction?.toAccountId || '')
+      setToAmount(editTransaction?.toAmount != null ? String(editTransaction.toAmount) : '')
       setContributeToGoals(false)
       setAllocationMode('proportional')
       setManualAllocations({})
@@ -58,6 +62,12 @@ export function TransactionModal({
   }, [isOpen, editTransaction])
 
   if (!isOpen) return null
+
+  // Cross-currency transfer: source and destination accounts differ in currency.
+  const fromAccountCurrency = accounts.find((a) => a.id === fromAccountId)?.currency || 'USD'
+  const toAccountCurrency = accounts.find((a) => a.id === toAccountId)?.currency || 'USD'
+  const isCrossCurrency =
+    type === 'transfer' && !!fromAccountId && !!toAccountId && fromAccountCurrency !== toAccountCurrency
 
   // Get goals for the selected to-account (only if it's a savings account)
   const toAccount = accounts.find((a) => a.id === toAccountId)
@@ -118,6 +128,12 @@ export function TransactionModal({
       ...(type === 'transfer' && {
         fromAccountId,
         toAccountId,
+        // Cross-currency: send the destination currency, plus the actual settled
+        // amount if the user entered one (else the API converts via the rate).
+        ...(isCrossCurrency && {
+          toCurrency: toAccountCurrency,
+          ...(toAmount && parseFloat(toAmount) > 0 && { toAmount: parseFloat(toAmount) }),
+        }),
         contributeToGoals,
         ...(contributeToGoals && {
           allocationMode,
@@ -358,6 +374,30 @@ export function TransactionModal({
                   <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.toAccountId}</p>
                 )}
               </div>
+
+              {/* Cross-currency destination amount (e.g. USD → DOP). Optional:
+                  blank lets the API convert at the current rate. */}
+              {isCrossCurrency && (
+                <div>
+                  <label htmlFor="txn-to-amount" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Amount received ({toAccountCurrency})
+                  </label>
+                  <input
+                    id="txn-to-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={toAmount}
+                    onChange={(e) => setToAmount(e.target.value)}
+                    placeholder="Auto-converts if left blank"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500"
+                  />
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Sending {fromAccountCurrency} → receiving {toAccountCurrency}. Enter the
+                    actual amount credited to match your statement.
+                  </p>
+                </div>
+              )}
 
               {/* Goal Allocation Section */}
               {hasGoals && (

@@ -8,7 +8,7 @@ import type {
 } from './types'
 import { AccountCard } from './AccountCard'
 import { AccountDrawer } from './AccountDrawer'
-import { toUsd, formatCurrency } from '@/lib/fx'
+import { formatCurrency } from '@/lib/fx'
 import {
   Plus,
   Landmark,
@@ -34,14 +34,9 @@ const categories: AccountCategory[] = [
   { key: ['wallet'], label: 'Wallet / Cash', icon: Wallet },
 ]
 
-/** Account's native currency, defaulting to USD when absent (e.g. older rows). */
-function accountCurrency(account: Account): string {
-  return 'currency' in account && account.currency ? account.currency : 'USD'
-}
-
-/** Sum a set of accounts in USD, converting each from its native currency. */
+/** Sum a set of accounts in USD using the API-provided `balanceUsd` field. */
 function sumUsd(accounts: Account[]): number {
-  return accounts.reduce((sum, acc) => sum + toUsd(Number(acc.balance), accountCurrency(acc)), 0)
+  return accounts.reduce((sum, acc) => sum + acc.balanceUsd, 0)
 }
 
 function groupAccountsByCategory(accounts: Account[]): Map<string, Account[]> {
@@ -100,7 +95,7 @@ export function AccountsView({
   const cashAccounts = accounts.filter((acc) => acc.type !== 'investment')
   const cashTotalUsd = sumUsd(cashAccounts)
   const accountCounts = countAccountsByType(accounts)
-  const netWorthChange = accounts.reduce((sum, acc) => sum + acc.balanceChange, 0)
+  const netWorthChange = accounts.reduce((sum, acc) => sum + acc.balanceChangeUsd, 0)
 
   const handleCardClick = (account: Account) => {
     setSelectedAccount(account)

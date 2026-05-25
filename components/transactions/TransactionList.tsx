@@ -145,7 +145,7 @@ export function TransactionList({
                 Income
               </p>
               <p className="font-[JetBrains_Mono,monospace] text-lg font-semibold text-emerald-700 dark:text-emerald-400">
-                +{formatCurrency(summary.totalIncome)}
+                +{formatCurrency(summary.totalIncomeUsd)}
               </p>
             </div>
           </div>
@@ -160,7 +160,7 @@ export function TransactionList({
                 Expenses
               </p>
               <p className="font-[JetBrains_Mono,monospace] text-lg font-semibold text-red-700 dark:text-red-400">
-                -{formatCurrency(summary.totalExpenses)}
+                -{formatCurrency(summary.totalExpensesUsd)}
               </p>
             </div>
           </div>

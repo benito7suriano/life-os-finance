@@ -1,14 +1,38 @@
 {
   "institutions": [
-    { "id": "inst-001", "name": "Banco Agrícola" },
-    { "id": "inst-002", "name": "Banco Cuscatlán" },
-    { "id": "inst-003", "name": "BAC Credomatic" },
-    { "id": "inst-004", "name": "Davivienda" }
+    {
+      "id": "inst-001",
+      "name": "Banco Agr\u00edcola"
+    },
+    {
+      "id": "inst-002",
+      "name": "Banco Cuscatl\u00e1n"
+    },
+    {
+      "id": "inst-003",
+      "name": "BAC Credomatic"
+    },
+    {
+      "id": "inst-004",
+      "name": "Davivienda"
+    }
   ],
   "creditCardProviders": [
-    { "id": "ccp-001", "name": "Visa", "icon": "visa" },
-    { "id": "ccp-002", "name": "Mastercard", "icon": "mastercard" },
-    { "id": "ccp-003", "name": "American Express", "icon": "amex" }
+    {
+      "id": "ccp-001",
+      "name": "Visa",
+      "icon": "visa"
+    },
+    {
+      "id": "ccp-002",
+      "name": "Mastercard",
+      "icon": "mastercard"
+    },
+    {
+      "id": "ccp-003",
+      "name": "American Express",
+      "icon": "amex"
+    }
   ],
   "accounts": [
     {
@@ -17,13 +41,15 @@
       "name": "Daily Expenses",
       "beneficiaryName": "Carlos Mendoza",
       "institutionId": "inst-001",
-      "institutionName": "Banco Agrícola",
+      "institutionName": "Banco Agr\u00edcola",
       "accountNumber": "1234567890",
-      "balance": 2847.50,
+      "balance": 2847.5,
       "currency": "USD",
       "interestRate": null,
       "hasDebitCard": true,
-      "balanceChange": 425.00
+      "balanceChange": 425.0,
+      "balanceUsd": 2847.5,
+      "balanceChangeUsd": 425.0
     },
     {
       "id": "acc-002",
@@ -31,13 +57,15 @@
       "name": "Family Account",
       "beneficiaryName": "Carlos Mendoza",
       "institutionId": "inst-002",
-      "institutionName": "Banco Cuscatlán",
+      "institutionName": "Banco Cuscatl\u00e1n",
       "accountNumber": "9876543210",
       "balance": 5120.75,
       "currency": "USD",
       "interestRate": null,
       "hasDebitCard": true,
-      "balanceChange": -340.25
+      "balanceChange": -340.25,
+      "balanceUsd": 5120.75,
+      "balanceChangeUsd": -340.25
     },
     {
       "id": "acc-003",
@@ -45,12 +73,14 @@
       "name": "Emergency Fund",
       "beneficiaryName": "Carlos Mendoza",
       "institutionId": "inst-001",
-      "institutionName": "Banco Agrícola",
+      "institutionName": "Banco Agr\u00edcola",
       "accountNumber": "5555666677",
-      "balance": 15000.00,
+      "balance": 15000.0,
       "currency": "USD",
       "interestRate": 2.5,
-      "balanceChange": 500.00
+      "balanceChange": 500.0,
+      "balanceUsd": 15000.0,
+      "balanceChangeUsd": 500.0
     },
     {
       "id": "acc-004",
@@ -60,10 +90,12 @@
       "institutionId": "inst-003",
       "institutionName": "BAC Credomatic",
       "accountNumber": null,
-      "balance": 3200.00,
+      "balance": 3200.0,
       "currency": "USD",
       "interestRate": 1.75,
-      "balanceChange": 400.00
+      "balanceChange": 400.0,
+      "balanceUsd": 3200.0,
+      "balanceChangeUsd": 400.0
     },
     {
       "id": "acc-005",
@@ -73,15 +105,18 @@
       "providerId": "ccp-001",
       "providerName": "Visa",
       "institutionId": "inst-001",
-      "institutionName": "Banco Agrícola",
+      "institutionName": "Banco Agr\u00edcola",
       "last4Digits": "4521",
       "expirationDate": "2027-03",
       "cutoffDate": 15,
       "paymentDate": 25,
       "interestRate": 18.5,
-      "balance": -1245.80,
-      "creditLimit": 5000.00,
-      "balanceChange": -320.50
+      "balance": -1245.8,
+      "creditLimit": 5000.0,
+      "balanceChange": -320.5,
+      "currency": "USD",
+      "balanceUsd": -1245.8,
+      "balanceChangeUsd": -320.5
     },
     {
       "id": "acc-006",
@@ -91,15 +126,18 @@
       "providerId": "ccp-002",
       "providerName": "Mastercard",
       "institutionId": "inst-002",
-      "institutionName": "Banco Cuscatlán",
+      "institutionName": "Banco Cuscatl\u00e1n",
       "last4Digits": "8834",
       "expirationDate": "2026-08",
       "cutoffDate": 20,
       "paymentDate": 5,
       "interestRate": 21.0,
       "balance": -478.25,
-      "creditLimit": 8000.00,
-      "balanceChange": -178.25
+      "creditLimit": 8000.0,
+      "balanceChange": -178.25,
+      "currency": "USD",
+      "balanceUsd": -478.25,
+      "balanceChangeUsd": -178.25
     },
     {
       "id": "acc-007",
@@ -107,16 +145,19 @@
       "name": "Home Mortgage",
       "institutionId": "inst-004",
       "institutionName": "Davivienda",
-      "balance": -142500.00,
-      "originalAmount": 180000.00,
+      "balance": -142500.0,
+      "originalAmount": 180000.0,
       "interestRate": 6.25,
-      "paymentAmount": 1150.00,
+      "paymentAmount": 1150.0,
       "paymentFrequency": "monthly",
       "dueDay": 1,
       "termMonths": 360,
       "originationDate": "2020-06-15",
       "maturityDate": "2050-06-15",
-      "balanceChange": 650.00
+      "balanceChange": 650.0,
+      "currency": "USD",
+      "balanceUsd": -142500.0,
+      "balanceChangeUsd": 650.0
     },
     {
       "id": "acc-008",
@@ -124,34 +165,41 @@
       "name": "Car Loan",
       "institutionId": "inst-003",
       "institutionName": "BAC Credomatic",
-      "balance": -8750.00,
-      "originalAmount": 22000.00,
+      "balance": -8750.0,
+      "originalAmount": 22000.0,
       "interestRate": 8.9,
-      "paymentAmount": 425.00,
+      "paymentAmount": 425.0,
       "paymentFrequency": "monthly",
       "dueDay": 15,
       "termMonths": 60,
       "originationDate": "2022-03-01",
       "maturityDate": "2027-03-01",
-      "balanceChange": 425.00
+      "balanceChange": 425.0,
+      "currency": "USD",
+      "balanceUsd": -8750.0,
+      "balanceChangeUsd": 425.0
     },
     {
       "id": "acc-009",
       "type": "wallet",
       "name": "Personal Wallet",
       "icon": "wallet",
-      "balance": 125.00,
+      "balance": 125.0,
       "currency": "USD",
-      "balanceChange": -45.00
+      "balanceChange": -45.0,
+      "balanceUsd": 125.0,
+      "balanceChangeUsd": -45.0
     },
     {
       "id": "acc-010",
       "type": "wallet",
       "name": "Travel Cash",
       "icon": "briefcase",
-      "balance": 350.00,
+      "balance": 350.0,
       "currency": "USD",
-      "balanceChange": 0
+      "balanceChange": 0,
+      "balanceUsd": 350.0,
+      "balanceChangeUsd": 0.0
     }
   ]
 }

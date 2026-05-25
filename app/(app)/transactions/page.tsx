@@ -39,8 +39,8 @@ export default function TransactionsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [serverSummary, setServerSummary] = useState<TransactionSummary>({
     count: 0,
-    totalIncome: 0,
-    totalExpenses: 0,
+    totalIncomeUsd: 0,
+    totalExpensesUsd: 0,
   })
 
   // UI state
@@ -220,6 +220,8 @@ export default function TransactionsPage() {
           accountId: data.accountId,
           fromAccountId: data.fromAccountId,
           toAccountId: data.toAccountId,
+          toAmount: data.toAmount,
+          toCurrency: data.toCurrency,
           goalAllocations: data.contributeToGoals
             ? data.allocationMode === 'manual' && data.manualAllocations
               ? Object.entries(data.manualAllocations)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createFinanceClient } from '@/lib/supabase/server'
+import { toUsd } from '@/lib/fx'
 
 export async function GET(request: NextRequest) {
   const supabase = await createFinanceClient()
@@ -106,12 +107,20 @@ export async function GET(request: NextRequest) {
 
   // Map DB snake_case to camelCase for frontend
   const mapped = (accounts || []).map((a) => {
+    const currency = a.currency || 'USD'
+    const balance = Number(a.balance)
+    const balanceChange = changeMap[a.id] || 0
     const base = {
       id: a.id,
       type: a.type,
       name: a.name,
-      balance: Number(a.balance),
-      balanceChange: changeMap[a.id] || 0,
+      balance,
+      balanceChange,
+      // USD-converted figures — the ONLY currency-aware numbers the UI should
+      // aggregate. Native `balance`/`balanceChange` are for display only.
+      currency,
+      balanceUsd: toUsd(balance, currency),
+      balanceChangeUsd: toUsd(balanceChange, currency),
       deletedAt: a.deleted_at || undefined,
     }
 

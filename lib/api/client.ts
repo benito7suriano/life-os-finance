@@ -57,7 +57,7 @@ function toQuery(filters: Record<string, unknown> | undefined): string {
 export function listTransactions(filters?: TransactionFilters) {
   return request<{
     transactions: unknown[]
-    summary: { count: number; totalIncome: number; totalExpenses: number }
+    summary: { count: number; totalIncomeUsd: number; totalExpensesUsd: number }
     totalCount: number
     page: number
     limit: number
