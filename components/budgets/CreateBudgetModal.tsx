@@ -1,15 +1,14 @@
-import { useState, useMemo } from 'react'
-import type { CreateBudgetModalProps } from './types'
+'use client'
 
-export function CreateBudgetModal({
-  categories,
-  savingsAccounts,
-  categoryAverages = {},
-  isOpen,
-  onClose,
-  onCreateBudget,
-  onCreateSinkingFund,
-}: CreateBudgetModalProps) {
+import { useState, useMemo, type CSSProperties } from 'react'
+import type { CreateBudgetModalProps } from './types'
+import { X } from 'lucide-react'
+import { Button } from '@/components/ui'
+
+const label: CSSProperties = { display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 500, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg3)' }
+const control: CSSProperties = { width: '100%', height: 42, borderRadius: 10, padding: '0 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--card-border)', color: 'var(--fg)', fontFamily: 'var(--font-sans)', fontSize: 14, outline: 'none', colorScheme: 'dark' }
+
+export function CreateBudgetModal({ categories, savingsAccounts, categoryAverages = {}, isOpen, onClose, onCreateBudget, onCreateSinkingFund }: CreateBudgetModalProps) {
   const [budgetType, setBudgetType] = useState<'monthly' | 'sinking_fund'>('monthly')
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null)
@@ -20,9 +19,8 @@ export function CreateBudgetModal({
   const [goalName, setGoalName] = useState('')
   const [linkedAccountId, setLinkedAccountId] = useState('')
 
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId)
+  const selectedCategory = categories.find((c) => c.id === selectedCategoryId)
 
-  // Trailing-12-month average for a given category/subcategory selection
   const avgFor = (categoryId: string, subcategoryId: string | null) => {
     const id = subcategoryId ?? categoryId
     const avg = id ? categoryAverages[id] : undefined
@@ -30,60 +28,35 @@ export function CreateBudgetModal({
   }
   const suggestedAmount = avgFor(selectedCategoryId, selectedSubcategoryId)
 
-  // Prefill the amount with the suggested average unless the user has edited it
   const applySuggestion = (categoryId: string, subcategoryId: string | null) => {
     if (amountTouched) return
     const avg = avgFor(categoryId, subcategoryId)
     setAmount(avg != null ? String(avg) : '')
   }
 
-  // Auto-calculate monthly contribution from target amount and target date
   const calculatedMonthly = useMemo(() => {
     const target = parseFloat(targetAmount)
     if (isNaN(target) || target <= 0 || !targetDate) return null
-
     const now = new Date()
     const end = new Date(targetDate)
-    const monthsLeft = Math.max(
-      1,
-      (end.getFullYear() - now.getFullYear()) * 12 + (end.getMonth() - now.getMonth())
-    )
+    const monthsLeft = Math.max(1, (end.getFullYear() - now.getFullYear()) * 12 + (end.getMonth() - now.getMonth()))
     return Math.round((target / monthsLeft) * 100) / 100
   }, [targetAmount, targetDate])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-
     if (budgetType === 'monthly') {
       const budgetAmount = parseFloat(amount)
       if (isNaN(budgetAmount) || budgetAmount <= 0) return
-
       const name = selectedSubcategoryId
-        ? selectedCategory?.subcategories.find(s => s.id === selectedSubcategoryId)?.name ?? ''
+        ? selectedCategory?.subcategories.find((s) => s.id === selectedSubcategoryId)?.name ?? ''
         : selectedCategory?.name ?? ''
-
-      onCreateBudget?.({
-        categoryId: selectedCategoryId,
-        subcategoryId: selectedSubcategoryId,
-        name,
-        type: 'monthly',
-        budgeted: budgetAmount,
-        isCategory: !selectedSubcategoryId,
-      })
+      onCreateBudget?.({ categoryId: selectedCategoryId, subcategoryId: selectedSubcategoryId, name, type: 'monthly', budgeted: budgetAmount, isCategory: !selectedSubcategoryId })
     } else {
       const target = parseFloat(targetAmount)
       if (isNaN(target) || target <= 0 || !targetDate || !linkedAccountId) return
-
-      onCreateSinkingFund?.({
-        categoryId: selectedCategoryId,
-        subcategoryId: selectedSubcategoryId,
-        name: goalName || selectedCategory?.name || '',
-        targetAmount: target,
-        targetDate,
-        linkedAccountId,
-      })
+      onCreateSinkingFund?.({ categoryId: selectedCategoryId, subcategoryId: selectedSubcategoryId, name: goalName || selectedCategory?.name || '', targetAmount: target, targetDate, linkedAccountId })
     }
-
     resetForm()
     onClose()
   }
@@ -106,79 +79,55 @@ export function CreateBudgetModal({
 
   if (!isOpen) return null
 
+  const segBtn = (active: boolean): CSSProperties => ({
+    flex: 1,
+    borderRadius: 8,
+    padding: '10px 12px',
+    border: 'none',
+    cursor: 'pointer',
+    background: active ? 'var(--accent-soft)' : 'transparent',
+    color: active ? 'var(--accent-a)' : 'var(--fg3)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 13,
+    fontWeight: 500,
+  })
+
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-sm z-40"
-        onClick={handleClose}
-      />
-
-      {/* Modal */}
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)' }} onClick={handleClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
-          className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
-          onClick={e => e.stopPropagation()}
+          className="w-full max-w-lg overflow-hidden"
+          style={{ background: 'var(--bg2)', border: '1px solid var(--card-border)', borderRadius: 18, boxShadow: '0 40px 100px -30px rgba(0,0,0,0.7)' }}
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Create New Budget
-            </h2>
-            <button
-              onClick={handleClose}
-              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+          <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid var(--card-border)' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--fg)' }}>Create New Budget</h2>
+            <button onClick={handleClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: 'var(--fg3)', background: 'rgba(255,255,255,0.04)' }}>
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Content */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* Budget Type Toggle */}
+          <form onSubmit={handleSubmit} className="space-y-6 p-6">
+            {/* Budget Type toggle */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Budget Type
-              </label>
-              <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setBudgetType('monthly')}
-                  className={`
-                    flex-1 px-4 py-2.5 text-sm font-medium rounded-md transition-all
-                    ${budgetType === 'monthly'
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400'
-                    }
-                  `}
-                >
+              <label style={label}>Budget Type</label>
+              <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                <button type="button" onClick={() => setBudgetType('monthly')} style={segBtn(budgetType === 'monthly')}>
                   <span className="block">Monthly Budget</span>
-                  <span className="block text-xs opacity-70 mt-0.5">Resets each month</span>
+                  <span className="block" style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>Resets each month</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setBudgetType('sinking_fund')}
-                  className={`
-                    flex-1 px-4 py-2.5 text-sm font-medium rounded-md transition-all
-                    ${budgetType === 'sinking_fund'
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400'
-                    }
-                  `}
-                >
+                <button type="button" onClick={() => setBudgetType('sinking_fund')} style={segBtn(budgetType === 'sinking_fund')}>
                   <span className="block">Sinking Fund</span>
-                  <span className="block text-xs opacity-70 mt-0.5">Accumulates over time</span>
+                  <span className="block" style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>Accumulates over time</span>
                 </button>
               </div>
             </div>
 
-            {/* Category Select */}
+            {/* Category */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Category
-              </label>
+              <label style={label}>Category</label>
               <select
                 value={selectedCategoryId}
                 onChange={(e) => {
@@ -186,21 +135,23 @@ export function CreateBudgetModal({
                   setSelectedSubcategoryId(null)
                   applySuggestion(e.target.value, null)
                 }}
-                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                style={control}
                 required
               >
                 <option value="">Select a category...</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
                 ))}
               </select>
             </div>
 
-            {/* Subcategory Select (optional) */}
+            {/* Subcategory */}
             {selectedCategory && selectedCategory.subcategories.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Subcategory <span className="text-slate-400">(optional)</span>
+                <label style={label}>
+                  Subcategory <span style={{ color: 'var(--fg4)' }}>(optional)</span>
                 </label>
                 <select
                   value={selectedSubcategoryId ?? ''}
@@ -209,24 +160,24 @@ export function CreateBudgetModal({
                     setSelectedSubcategoryId(sub)
                     applySuggestion(selectedCategoryId, sub)
                   }}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  style={control}
                 >
                   <option value="">Budget entire category</option>
-                  {selectedCategory.subcategories.map(sub => (
-                    <option key={sub.id} value={sub.id}>{sub.name}</option>
+                  {selectedCategory.subcategories.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* Monthly Budget Fields */}
+            {/* Monthly amount */}
             {budgetType === 'monthly' && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Monthly Budget Amount
-                </label>
+                <label style={label}>Monthly Budget Amount</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: 14 }}>$</span>
                   <input
                     type="number"
                     value={amount}
@@ -237,50 +188,32 @@ export function CreateBudgetModal({
                     placeholder="0.00"
                     step="0.01"
                     min="0"
-                    className="w-full pl-8 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    style={{ ...control, paddingLeft: 26, fontFamily: 'var(--font-mono)' }}
                     required
                   />
                 </div>
                 {suggestedAmount != null && (
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  <p style={{ marginTop: 8, fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg3)' }}>
                     Avg last 12 mo:{' '}
-                    <span className="font-medium text-slate-700 dark:text-slate-300">
-                      ${suggestedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg2)' }}>${suggestedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </p>
                 )}
               </div>
             )}
 
-            {/* Sinking Fund Fields */}
+            {/* Sinking fund fields */}
             {budgetType === 'sinking_fund' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Goal Name
-                  </label>
-                  <input
-                    type="text"
-                    value={goalName}
-                    onChange={(e) => setGoalName(e.target.value)}
-                    placeholder="e.g., Summer Vacation"
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    required
-                  />
+                  <label style={label}>Goal Name</label>
+                  <input type="text" value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="e.g., Summer Vacation" style={control} required />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Savings Account
-                  </label>
-                  <select
-                    value={linkedAccountId}
-                    onChange={(e) => setLinkedAccountId(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    required
-                  >
+                  <label style={label}>Savings Account</label>
+                  <select value={linkedAccountId} onChange={(e) => setLinkedAccountId(e.target.value)} style={control} required>
                     <option value="">Select a savings account...</option>
-                    {savingsAccounts.map(acc => (
+                    {savingsAccounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
                         {acc.name} (${acc.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })})
                       </option>
@@ -290,43 +223,22 @@ export function CreateBudgetModal({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Target Amount
-                    </label>
+                    <label style={label}>Target Amount</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">$</span>
-                      <input
-                        type="number"
-                        value={targetAmount}
-                        onChange={(e) => setTargetAmount(e.target.value)}
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                        className="w-full pl-8 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        required
-                      />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: 14 }}>$</span>
+                      <input type="number" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} placeholder="0.00" step="0.01" min="0" style={{ ...control, paddingLeft: 26, fontFamily: 'var(--font-mono)' }} required />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Target Date
-                    </label>
-                    <input
-                      type="date"
-                      value={targetDate}
-                      onChange={(e) => setTargetDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]}
-                      className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      required
-                    />
+                    <label style={label}>Target Date</label>
+                    <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} min={new Date().toISOString().split('T')[0]} style={control} required />
                   </div>
                 </div>
 
-                {/* Auto-calculated monthly contribution */}
                 {calculatedMonthly !== null && (
-                  <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
-                    <p className="text-sm text-emerald-700 dark:text-emerald-400">
-                      Estimated monthly contribution: <span className="font-semibold">${calculatedMonthly.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  <div className="rounded-xl p-4" style={{ background: 'var(--accent-soft)', border: '1px solid rgba(125,211,252,0.25)' }}>
+                    <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--accent-a)' }}>
+                      Estimated monthly contribution: <span style={{ fontWeight: 600 }}>${calculatedMonthly.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                     </p>
                   </div>
                 )}
@@ -334,20 +246,13 @@ export function CreateBudgetModal({
             )}
 
             {/* Submit */}
-            <div className="flex gap-3 pt-4">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
+            <div className="flex gap-3 pt-2">
+              <Button type="button" variant="secondary" fullWidth onClick={handleClose}>
                 Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-              >
+              </Button>
+              <Button type="submit" variant="primary" fullWidth>
                 Create {budgetType === 'monthly' ? 'Budget' : 'Sinking Fund'}
-              </button>
+              </Button>
             </div>
           </form>
         </div>

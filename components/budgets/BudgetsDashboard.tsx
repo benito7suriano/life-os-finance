@@ -1,20 +1,51 @@
-import { useState, useMemo } from 'react'
-import type {
-  BudgetsProps,
-  Budget,
-  Goal,
-  TimeRange,
-  FilterState,
-  BudgetTypeFilter,
-  SortField,
-} from './types'
+'use client'
+
+import { useState, useMemo, type CSSProperties } from 'react'
+import type { BudgetsProps, Budget, Goal, TimeRange, FilterState, BudgetTypeFilter, SortField } from './types'
 import { SpendingChart } from './SpendingChart'
-import { CategorySpending } from './CategorySpending'
 import { BudgetCard } from './BudgetCard'
 import { BudgetDrawer } from './BudgetDrawer'
 import { CreateBudgetModal } from './CreateBudgetModal'
+import { Card, Button, Badge, Empty, formatCurrency } from '@/components/ui'
+import { Plus, ChevronLeft, ChevronRight, LayoutGrid, Wallet, Star, PiggyBank } from 'lucide-react'
 
 type BudgetOrGoal = { type: 'budget'; item: Budget } | { type: 'goal'; item: Goal }
+
+const TYPE_TABS: { value: BudgetTypeFilter; label: string; icon: React.ElementType }[] = [
+  { value: 'all', label: 'All', icon: LayoutGrid },
+  { value: 'monthly', label: 'Monthly', icon: Wallet },
+  { value: 'sinking_fund', label: 'Sinking funds', icon: Star },
+]
+
+// ─── budget-usage ring ──────────────────────────────────────────────────
+function BudgetRing({ percent, size = 160, stroke = 14 }: { percent: number; size?: number; stroke?: number }) {
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const pct = Math.max(0, Math.min(percent / 100, 1))
+  const over = percent > 100
+  const ringColor = over ? 'var(--bad)' : percent >= 90 ? 'var(--warn)' : 'var(--accent-a)'
+  return (
+    <div style={{ position: 'relative', width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={ringColor}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${pct * circ} ${circ}`}
+        />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--fg3)' }}>used</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 600, color: 'var(--fg)', marginTop: 6 }}>{percent}%</div>
+      </div>
+    </div>
+  )
+}
 
 export function BudgetsDashboard({
   summary,
@@ -25,7 +56,6 @@ export function BudgetsDashboard({
   savingsAccounts,
   monthlyHistory,
   categoryAverages,
-  categorySpending,
   selectedMonth,
   transactions,
   onViewBudget,
@@ -41,46 +71,22 @@ export function BudgetsDashboard({
   onFilterChange,
 }: BudgetsProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>('12months')
-  const [filter, setFilter] = useState<FilterState>({
-    type: 'all',
-    sortField: 'percentUsed',
-    sortDirection: 'desc',
-  })
+  const [filter, setFilter] = useState<FilterState>({ type: 'all', sortField: 'percentUsed', sortDirection: 'desc' })
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null)
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
-  // Combine and sort all budgets and goals
   const sortedItems = useMemo(() => {
-    let items: BudgetOrGoal[] = []
+    const items: BudgetOrGoal[] = []
+    if (filter.type !== 'sinking_fund') items.push(...budgets.map((b) => ({ type: 'budget' as const, item: b })))
+    if (filter.type !== 'monthly') items.push(...goals.map((g) => ({ type: 'goal' as const, item: g })))
 
-    if (filter.type !== 'sinking_fund') {
-      items.push(...budgets.map(b => ({ type: 'budget' as const, item: b })))
-    }
-
-    if (filter.type !== 'monthly') {
-      items.push(...goals.map(g => ({ type: 'goal' as const, item: g })))
-    }
-
-    const getPercentUsed = (entry: BudgetOrGoal): number => {
-      if (entry.type === 'budget') {
-        return entry.item.budgeted > 0 ? entry.item.spent / entry.item.budgeted : 0
-      }
-      return entry.item.targetAmount > 0 ? entry.item.currentBalance / entry.item.targetAmount : 0
-    }
-
-    const getAmount = (entry: BudgetOrGoal): number => {
-      if (entry.type === 'budget') return entry.item.budgeted
-      return entry.item.targetAmount
-    }
-
-    const getSpent = (entry: BudgetOrGoal): number => {
-      if (entry.type === 'budget') return entry.item.spent
-      return entry.item.currentBalance
-    }
-
-    const getName = (entry: BudgetOrGoal): string => entry.item.name
+    const getPercentUsed = (e: BudgetOrGoal) =>
+      e.type === 'budget' ? (e.item.budgeted > 0 ? e.item.spent / e.item.budgeted : 0) : e.item.targetAmount > 0 ? e.item.currentBalance / e.item.targetAmount : 0
+    const getAmount = (e: BudgetOrGoal) => (e.type === 'budget' ? e.item.budgeted : e.item.targetAmount)
+    const getSpent = (e: BudgetOrGoal) => (e.type === 'budget' ? e.item.spent : e.item.currentBalance)
+    const getName = (e: BudgetOrGoal) => e.item.name
 
     items.sort((a, b) => {
       let comparison = 0
@@ -100,7 +106,6 @@ export function BudgetsDashboard({
       }
       return filter.sortDirection === 'asc' ? comparison : -comparison
     })
-
     return items
   }, [budgets, goals, filter])
 
@@ -118,17 +123,11 @@ export function BudgetsDashboard({
   const handleCardClick = (budget?: Budget, goal?: Goal) => {
     if (budget) {
       setSelectedBudget(budget)
-      setSelectedGoal(
-        budget.linkedGoalId
-          ? goals.find(g => g.id === budget.linkedGoalId) ?? null
-          : null
-      )
+      setSelectedGoal(budget.linkedGoalId ? goals.find((g) => g.id === budget.linkedGoalId) ?? null : null)
       onViewBudget?.(budget.id)
     } else if (goal) {
       setSelectedGoal(goal)
-      setSelectedBudget(
-        budgets.find(b => b.id === goal.linkedBudgetId) ?? null
-      )
+      setSelectedBudget(budgets.find((b) => b.id === goal.linkedBudgetId) ?? null)
       onViewGoal?.(goal.id)
     }
     setIsDrawerOpen(true)
@@ -140,15 +139,14 @@ export function BudgetsDashboard({
     setSelectedGoal(null)
   }
 
-  // Get contributions filtered for the selected goal
   const selectedContributions = useMemo(() => {
     if (!selectedGoal) return []
-    return goalContributions.filter(c => c.goalId === selectedGoal.id)
+    return goalContributions.filter((c) => c.goalId === selectedGoal.id)
   }, [selectedGoal, goalContributions])
 
-  const percentUsed = summary.totalBudgeted > 0
-    ? Math.round((summary.totalSpent / summary.totalBudgeted) * 100)
-    : 0
+  const percentUsed = summary.totalBudgeted > 0 ? Math.round((summary.totalSpent / summary.totalBudgeted) * 100) : 0
+  const remaining = summary.totalBudgeted - summary.totalSpent
+  const over = remaining < 0
 
   // Month navigation (YYYY-MM)
   const currentMonthStr = (() => {
@@ -163,197 +161,168 @@ export function BudgetsDashboard({
   }
   const canGoNext = activeMonth < currentMonthStr
 
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              Budgets
-            </h1>
-            {onMonthChange ? (
-              <div className="flex items-center gap-2 mt-1">
-                <button
-                  onClick={() => onMonthChange(shiftMonth(activeMonth, -1))}
-                  className="p-1 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  aria-label="Previous month"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <span className="text-sm font-medium text-slate-600 dark:text-slate-300 min-w-[8rem] text-center">
-                  {summary.month}
-                </span>
-                <button
-                  onClick={() => canGoNext && onMonthChange(shiftMonth(activeMonth, 1))}
-                  disabled={!canGoNext}
-                  className="p-1 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                  aria-label="Next month"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                {summary.month}
-              </p>
-            )}
-          </div>
+  const eyebrow: CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg3)' }
+  const breakdown = [
+    { k: 'Total Budgeted', v: formatCurrency(summary.totalBudgeted), color: 'var(--fg)' },
+    { k: 'Total Spent', v: formatCurrency(summary.totalSpent), color: over ? 'var(--warn)' : 'var(--fg)' },
+    { k: 'Remaining', v: formatCurrency(Math.abs(remaining)) + (over ? ' over' : ''), color: over ? 'var(--bad)' : 'var(--good)' },
+  ]
 
+  const selectStyle: CSSProperties = {
+    height: 36,
+    borderRadius: 10,
+    padding: '0 10px',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid var(--card-border)',
+    color: 'var(--fg)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 13,
+    outline: 'none',
+    colorScheme: 'dark',
+  }
+
+  return (
+    <div className="mx-auto max-w-6xl p-4 md:p-6 lg:px-8 lg:py-6">
+      {/* Header */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }}>Budgets</h1>
+          {onMonthChange ? (
+            <div className="mt-1.5 flex items-center gap-2">
+              <button onClick={() => onMonthChange(shiftMonth(activeMonth, -1))} aria-label="Previous month" className="flex h-7 w-7 items-center justify-center rounded-md" style={{ color: 'var(--fg3)' }}>
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="min-w-[8rem] text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg2)' }}>{summary.month}</span>
+              <button
+                onClick={() => canGoNext && onMonthChange(shiftMonth(activeMonth, 1))}
+                disabled={!canGoNext}
+                aria-label="Next month"
+                className="flex h-7 w-7 items-center justify-center rounded-md disabled:opacity-30"
+                style={{ color: 'var(--fg3)' }}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <p style={{ marginTop: 4, fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg3)' }}>{summary.month}</p>
+          )}
+        </div>
+        <Button variant="primary" icon={Plus} onClick={() => setIsCreateModalOpen(true)}>
+          Add Budget
+        </Button>
+      </div>
+
+      {/* Overview hero */}
+      <Card accent pad={28} style={{ marginBottom: 24, overflow: 'hidden' }}>
+        <div aria-hidden style={{ position: 'absolute', right: -60, top: -60, width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle, var(--accent-soft), transparent 60%)', pointerEvents: 'none' }} />
+        <div className="relative grid grid-cols-1 items-center gap-8 md:grid-cols-[160px_1fr]">
+          <div className="mx-auto md:mx-0">
+            <BudgetRing percent={percentUsed} />
+          </div>
+          <div>
+            <div className="mb-2 flex items-center gap-3">
+              <span style={{ ...eyebrow, letterSpacing: '0.18em' }}>Monthly budget · {summary.month}</span>
+              <Badge tone={over ? 'bad' : 'good'} dot>
+                {over ? 'over budget' : 'on track'}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap items-baseline gap-3">
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 44, fontWeight: 600, letterSpacing: '-0.025em', color: 'var(--fg)' }}>
+                {formatCurrency(summary.totalSpent)}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--fg3)' }}>/ {formatCurrency(summary.totalBudgeted)}</span>
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-4">
+              {breakdown.map((row, i) => (
+                <div key={row.k} style={{ paddingLeft: i ? 16 : 0, borderLeft: i ? '1px solid var(--card-border)' : 'none' }}>
+                  <div style={eyebrow}>{row.k}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, color: row.color, marginTop: 8 }}>{row.v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Spending chart */}
+      <div className="mb-6">
+        <SpendingChart data={monthlyHistory} timeRange={timeRange} onTimeRangeChange={handleTimeRangeChange} />
+      </div>
+
+      {/* Tabs + sort */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="inline-flex gap-0.5 self-start rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)' }}>
+          {TYPE_TABS.map((tab) => {
+            const active = filter.type === tab.value
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.value}
+                onClick={() => handleFilterChange({ type: tab.value })}
+                className="inline-flex items-center gap-1.5 rounded-[9px] px-3.5 py-2"
+                style={{
+                  background: active ? 'var(--accent-soft)' : 'transparent',
+                  color: active ? 'var(--accent-a)' : 'var(--fg2)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 12,
+                  fontWeight: 500,
+                }}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+        <span className="hidden flex-1 sm:block" />
+        <div className="flex items-center gap-2">
+          <label style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg3)' }}>Sort by:</label>
+          <select value={filter.sortField} onChange={(e) => handleFilterChange({ sortField: e.target.value as SortField })} style={selectStyle}>
+            <option value="percentUsed">% Used</option>
+            <option value="name">Name</option>
+            <option value="budgeted">Amount</option>
+            <option value="spent">Spent</option>
+          </select>
           <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+            onClick={() => handleFilterChange({ sortDirection: filter.sortDirection === 'asc' ? 'desc' : 'asc' })}
+            aria-label={filter.sortDirection === 'asc' ? 'Sort descending' : 'Sort ascending'}
+            className="flex h-9 w-9 items-center justify-center rounded-lg"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--card-border)', color: 'var(--fg2)' }}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Budget
+            <ChevronLeft className="h-4 w-4" style={{ transform: filter.sortDirection === 'desc' ? 'rotate(-90deg)' : 'rotate(90deg)' }} />
           </button>
         </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-              Total Budgeted
-            </p>
-            <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              ${summary.totalBudgeted.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-              Total Spent
-            </p>
-            <p className={`text-2xl font-bold ${percentUsed > 100 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100'}`}>
-              ${summary.totalSpent.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-              Remaining
-            </p>
-            {summary.totalBudgeted > 0 ? (
-              <>
-                <p className={`text-2xl font-bold ${summary.totalBudgeted - summary.totalSpent < 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                  ${Math.abs(summary.totalBudgeted - summary.totalSpent).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  {summary.totalBudgeted - summary.totalSpent < 0 && ' over'}
-                </p>
-                <div className="mt-3 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${percentUsed > 100 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                    style={{ width: `${Math.min(percentUsed, 100)}%` }}
-                  />
-                </div>
-              </>
-            ) : (
-              <p className="text-2xl font-bold text-slate-400 dark:text-slate-500">—</p>
-            )}
-          </div>
-        </div>
-
-        {/* Spending Chart */}
-        <div className="mb-8">
-          <SpendingChart
-            data={monthlyHistory}
-            timeRange={timeRange}
-            onTimeRangeChange={handleTimeRangeChange}
-          />
-        </div>
-
-        {/* Spending by Category (selected month) */}
-        <div className="mb-8">
-          <CategorySpending data={categorySpending ?? []} month={summary.month} />
-        </div>
-
-        {/* Filter Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Type:</label>
-            <select
-              value={filter.type}
-              onChange={(e) => handleFilterChange({ type: e.target.value as BudgetTypeFilter })}
-              className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="all">All</option>
-              <option value="monthly">Monthly Budgets</option>
-              <option value="sinking_fund">Sinking Funds</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Sort by:</label>
-            <select
-              value={filter.sortField}
-              onChange={(e) => handleFilterChange({ sortField: e.target.value as SortField })}
-              className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="percentUsed">% Used</option>
-              <option value="name">Name</option>
-              <option value="budgeted">Amount</option>
-              <option value="spent">Spent</option>
-            </select>
-            <button
-              onClick={() => handleFilterChange({ sortDirection: filter.sortDirection === 'asc' ? 'desc' : 'asc' })}
-              className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-              title={filter.sortDirection === 'asc' ? 'Sort descending' : 'Sort ascending'}
-            >
-              <svg className={`w-4 h-4 text-slate-600 dark:text-slate-400 transition-transform ${filter.sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Budget Cards Grid */}
-        {sortedItems.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-              <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-1">No budgets yet</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-              Create your first budget to start tracking spending
-            </p>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add your first budget
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedItems.map((entry) => (
-              entry.type === 'budget' ? (
-                <BudgetCard
-                  key={entry.item.id}
-                  budget={entry.item}
-                  isCategory={entry.item.isCategory}
-                  onClick={() => handleCardClick(entry.item)}
-                />
-              ) : (
-                <BudgetCard
-                  key={entry.item.id}
-                  goal={entry.item}
-                  onClick={() => handleCardClick(undefined, entry.item)}
-                />
-              )
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* Grid */}
+      {sortedItems.length === 0 ? (
+        <Card pad={0}>
+          <Empty
+            icon={PiggyBank}
+            title="No budgets yet"
+            body="Create your first budget to start tracking spending"
+            action={
+              <div className="mt-4 flex justify-center">
+                <Button variant="ghost" icon={Plus} onClick={() => setIsCreateModalOpen(true)}>
+                  Add your first budget
+                </Button>
+              </div>
+            }
+          />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {sortedItems.map((entry) =>
+            entry.type === 'budget' ? (
+              <BudgetCard key={entry.item.id} budget={entry.item} isCategory={entry.item.isCategory} onClick={() => handleCardClick(entry.item)} />
+            ) : (
+              <BudgetCard key={entry.item.id} goal={entry.item} onClick={() => handleCardClick(undefined, entry.item)} />
+            ),
+          )}
+        </div>
+      )}
 
       {/* Drawer */}
       <BudgetDrawer
