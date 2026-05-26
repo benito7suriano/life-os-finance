@@ -6,3 +6,6 @@ export type { MainNavProps, NavItem } from './MainNav'
 
 export { UserMenu } from './UserMenu'
 export type { UserMenuProps } from './UserMenu'
+
+export { TopBar } from './TopBar'
+export type { TopBarProps } from './TopBar'

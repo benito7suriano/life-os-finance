@@ -1,12 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import type {
-  Account,
-  AccountType,
-  AccountDrawerProps,
-} from './types'
+import { useState, useEffect, type CSSProperties } from 'react'
+import type { Account, AccountType, AccountDrawerProps } from './types'
 import { X, Trash2, RotateCcw } from 'lucide-react'
+import { Button } from '@/components/ui'
 
 const accountTypeLabels: Record<AccountType, string> = {
   checking: 'Checking Account',
@@ -27,41 +24,48 @@ const accountTypeOptions: { value: AccountType; label: string }[] = [
 ]
 
 function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(amount)
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount)
 }
 
-export function AccountDrawer({
-  account,
-  isOpen,
-  onClose,
-  onSave,
-  onDelete,
-  onRestore,
-  institutions,
-  creditCardProviders,
-}: AccountDrawerProps) {
+// ─── shared field styles ───────────────────────────────────────────────
+const label: CSSProperties = {
+  display: 'block',
+  marginBottom: 6,
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10,
+  fontWeight: 500,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: 'var(--fg3)',
+}
+
+const control: CSSProperties = {
+  width: '100%',
+  height: 42,
+  borderRadius: 10,
+  padding: '0 12px',
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid var(--card-border)',
+  color: 'var(--fg)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 14,
+  outline: 'none',
+  colorScheme: 'dark',
+}
+
+export function AccountDrawer({ account, isOpen, onClose, onSave, onDelete, onRestore, institutions, creditCardProviders }: AccountDrawerProps) {
   const isEditing = !!account
   const isArchived = !!account?.deletedAt
   const [selectedType, setSelectedType] = useState<AccountType>(account?.type || 'checking')
 
   useEffect(() => {
-    if (account) {
-      setSelectedType(account.type)
-    } else {
-      setSelectedType('checking')
-    }
+    setSelectedType(account ? account.type : 'checking')
   }, [account, isOpen])
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    const data: Record<string, unknown> = {
-      type: selectedType,
-    }
+    const data: Record<string, unknown> = { type: selectedType }
 
     formData.forEach((value, key) => {
       if (value !== '') {
@@ -75,9 +79,7 @@ export function AccountDrawer({
       }
     })
 
-    if (account?.id) {
-      data.id = account.id
-    }
+    if (account?.id) data.id = account.id
 
     onSave?.(data as Partial<Account>)
     onClose()
@@ -87,50 +89,35 @@ export function AccountDrawer({
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`fixed inset-0 z-40 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)' }}
         onClick={onClose}
       />
 
       {/* Drawer */}
       <div
-        className={`fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white dark:bg-slate-900
-                    shadow-2xl transform transition-transform duration-300 ease-out
-                    ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed inset-y-0 right-0 z-50 w-full max-w-lg transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        style={{ background: 'var(--bg2)', borderLeft: '1px solid var(--card-border)', boxShadow: '-30px 0 80px -30px rgba(0,0,0,0.7)' }}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--card-border)' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--fg)' }}>
               {isEditing ? `Edit ${accountTypeLabels[account.type]}` : 'New Account'}
             </h2>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100
-                         dark:hover:text-slate-300 dark:hover:bg-slate-800 transition-colors"
-            >
-              <X className="w-5 h-5" />
+            <button onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: 'var(--fg3)', background: 'rgba(255,255,255,0.04)' }}>
+              <X className="h-5 w-5" />
             </button>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-            <div className="p-6 space-y-6">
-              {/* Account Type (only for new accounts) */}
+            <div className="space-y-6 p-6">
+              {/* Account Type (new only) */}
               {!isEditing && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Account Type
-                  </label>
-                  <select
-                    value={selectedType}
-                    onChange={(e) => setSelectedType(e.target.value as AccountType)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                               bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                               focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                               transition-colors"
-                  >
+                  <label style={label}>Account Type</label>
+                  <select value={selectedType} onChange={(e) => setSelectedType(e.target.value as AccountType)} style={control}>
                     {accountTypeOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -140,81 +127,41 @@ export function AccountDrawer({
                 </div>
               )}
 
-              {/* Common Fields: Name */}
+              {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Account Name
-                </label>
+                <label style={label}>Account Name</label>
                 <input
                   type="text"
                   name="name"
                   defaultValue={account?.name || ''}
                   placeholder={selectedType === 'savings' ? 'e.g., Emergency Fund' : 'e.g., My Checking'}
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                             bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                             placeholder:text-slate-400 dark:placeholder:text-slate-500
-                             focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                             transition-colors"
+                  style={control}
                   required
                 />
               </div>
 
-              {/* Checking & Savings specific fields */}
+              {/* Checking & Savings */}
               {(selectedType === 'checking' || selectedType === 'savings') && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Beneficiary Name
-                    </label>
+                    <label style={label}>Beneficiary Name</label>
                     <input
                       type="text"
                       name="beneficiaryName"
-                      defaultValue={
-                        (account?.type === 'checking' || account?.type === 'savings')
-                          ? account.beneficiaryName
-                          : ''
-                      }
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                 bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                 transition-colors"
+                      defaultValue={account?.type === 'checking' || account?.type === 'savings' ? account.beneficiaryName : ''}
+                      style={control}
                       required
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Balance
-                      </label>
-                      <input
-                        type="number"
-                        name="balance"
-                        step="0.01"
-                        defaultValue={account?.balance || ''}
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Balance</label>
+                      <input type="number" name="balance" step="0.01" defaultValue={account?.balance || ''} style={control} required />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Currency
-                      </label>
-                      <select
-                        name="currency"
-                        defaultValue={
-                          (account?.type === 'checking' || account?.type === 'savings')
-                            ? account.currency
-                            : 'USD'
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                      >
+                      <label style={label}>Currency</label>
+                      <select name="currency" defaultValue={account?.type === 'checking' || account?.type === 'savings' ? account.currency : 'USD'} style={control}>
                         <option value="USD">USD</option>
                         <option value="EUR">EUR</option>
                         <option value="GBP">GBP</option>
@@ -223,21 +170,8 @@ export function AccountDrawer({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Institution (optional)
-                    </label>
-                    <select
-                      name="institutionId"
-                      defaultValue={
-                        (account?.type === 'checking' || account?.type === 'savings')
-                          ? account.institutionId || ''
-                          : ''
-                      }
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                 bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                 transition-colors"
-                    >
+                    <label style={label}>Institution (optional)</label>
+                    <select name="institutionId" defaultValue={account?.type === 'checking' || account?.type === 'savings' ? account.institutionId || '' : ''} style={control}>
                       <option value="">Select institution...</option>
                       {institutions.map((inst) => (
                         <option key={inst.id} value={inst.id}>
@@ -248,42 +182,13 @@ export function AccountDrawer({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Account Number (optional)
-                    </label>
-                    <input
-                      type="text"
-                      name="accountNumber"
-                      defaultValue={
-                        (account?.type === 'checking' || account?.type === 'savings')
-                          ? account.accountNumber || ''
-                          : ''
-                      }
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                 bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                 transition-colors"
-                    />
+                    <label style={label}>Account Number (optional)</label>
+                    <input type="text" name="accountNumber" defaultValue={account?.type === 'checking' || account?.type === 'savings' ? account.accountNumber || '' : ''} style={control} />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Interest Rate % (optional)
-                    </label>
-                    <input
-                      type="number"
-                      name="interestRate"
-                      step="0.01"
-                      defaultValue={
-                        (account?.type === 'checking' || account?.type === 'savings')
-                          ? account.interestRate || ''
-                          : ''
-                      }
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                 bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                 transition-colors"
-                    />
+                    <label style={label}>Interest Rate % (optional)</label>
+                    <input type="number" name="interestRate" step="0.01" defaultValue={account?.type === 'checking' || account?.type === 'savings' ? account.interestRate || '' : ''} style={control} />
                   </div>
 
                   {selectedType === 'checking' && (
@@ -292,39 +197,23 @@ export function AccountDrawer({
                         type="checkbox"
                         name="hasDebitCard"
                         value="true"
-                        defaultChecked={
-                          account?.type === 'checking' ? account.hasDebitCard : false
-                        }
-                        className="w-4 h-4 rounded border-slate-300 text-emerald-600
-                                   focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-800"
+                        defaultChecked={account?.type === 'checking' ? account.hasDebitCard : false}
+                        className="h-4 w-4 rounded"
+                        style={{ accentColor: 'var(--accent-solid)' }}
                       />
-                      <label className="text-sm text-slate-700 dark:text-slate-300">
-                        Has debit card
-                      </label>
+                      <label style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg2)' }}>Has debit card</label>
                     </div>
                   )}
                 </>
               )}
 
-              {/* Credit Card specific fields */}
+              {/* Credit Card */}
               {selectedType === 'credit_card' && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Card Provider
-                      </label>
-                      <select
-                        name="providerId"
-                        defaultValue={
-                          account?.type === 'credit_card' ? account.providerId : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      >
+                      <label style={label}>Card Provider</label>
+                      <select name="providerId" defaultValue={account?.type === 'credit_card' ? account.providerId : ''} style={control} required>
                         <option value="">Select...</option>
                         {creditCardProviders.map((provider) => (
                           <option key={provider.id} value={provider.id}>
@@ -334,20 +223,8 @@ export function AccountDrawer({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Institution
-                      </label>
-                      <select
-                        name="institutionId"
-                        defaultValue={
-                          account?.type === 'credit_card' ? account.institutionId : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      >
+                      <label style={label}>Institution</label>
+                      <select name="institutionId" defaultValue={account?.type === 'credit_card' ? account.institutionId : ''} style={control} required>
                         <option value="">Select...</option>
                         {institutions.map((inst) => (
                           <option key={inst.id} value={inst.id}>
@@ -360,160 +237,57 @@ export function AccountDrawer({
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Last 4 Digits
-                      </label>
+                      <label style={label}>Last 4 Digits</label>
                       <input
                         type="text"
                         name="last4Digits"
                         maxLength={4}
                         pattern="[0-9]{4}"
-                        defaultValue={
-                          account?.type === 'credit_card' ? account.last4Digits : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors font-mono"
+                        defaultValue={account?.type === 'credit_card' ? account.last4Digits : ''}
+                        style={{ ...control, fontFamily: 'var(--font-mono)' }}
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Expiration Date
-                      </label>
-                      <input
-                        type="month"
-                        name="expirationDate"
-                        defaultValue={
-                          account?.type === 'credit_card' ? account.expirationDate : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Expiration Date</label>
+                      <input type="month" name="expirationDate" defaultValue={account?.type === 'credit_card' ? account.expirationDate : ''} style={control} required />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Current Balance
-                      </label>
-                      <input
-                        type="number"
-                        name="balance"
-                        step="0.01"
-                        defaultValue={
-                          account?.type === 'credit_card' ? Math.abs(account.balance) : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Current Balance</label>
+                      <input type="number" name="balance" step="0.01" defaultValue={account?.type === 'credit_card' ? Math.abs(account.balance) : ''} style={control} required />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Credit Limit
-                      </label>
-                      <input
-                        type="number"
-                        name="creditLimit"
-                        step="0.01"
-                        defaultValue={
-                          account?.type === 'credit_card' ? account.creditLimit : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Credit Limit</label>
+                      <input type="number" name="creditLimit" step="0.01" defaultValue={account?.type === 'credit_card' ? account.creditLimit : ''} style={control} required />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Cutoff Day
-                      </label>
-                      <input
-                        type="number"
-                        name="cutoffDate"
-                        min="1"
-                        max="31"
-                        defaultValue={
-                          account?.type === 'credit_card' ? account.cutoffDate : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Cutoff Day</label>
+                      <input type="number" name="cutoffDate" min="1" max="31" defaultValue={account?.type === 'credit_card' ? account.cutoffDate : ''} style={control} required />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Payment Day
-                      </label>
-                      <input
-                        type="number"
-                        name="paymentDate"
-                        min="1"
-                        max="31"
-                        defaultValue={
-                          account?.type === 'credit_card' ? account.paymentDate : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Payment Day</label>
+                      <input type="number" name="paymentDate" min="1" max="31" defaultValue={account?.type === 'credit_card' ? account.paymentDate : ''} style={control} required />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Interest %
-                      </label>
-                      <input
-                        type="number"
-                        name="interestRate"
-                        step="0.01"
-                        defaultValue={
-                          account?.type === 'credit_card' ? account.interestRate : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Interest %</label>
+                      <input type="number" name="interestRate" step="0.01" defaultValue={account?.type === 'credit_card' ? account.interestRate : ''} style={control} required />
                     </div>
                   </div>
                 </>
               )}
 
-              {/* Loan specific fields */}
+              {/* Loan */}
               {selectedType === 'loan' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Institution (optional)
-                    </label>
-                    <select
-                      name="institutionId"
-                      defaultValue={
-                        account?.type === 'loan' ? account.institutionId || '' : ''
-                      }
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                 bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                 transition-colors"
-                    >
+                    <label style={label}>Institution (optional)</label>
+                    <select name="institutionId" defaultValue={account?.type === 'loan' ? account.institutionId || '' : ''} style={control}>
                       <option value="">Select institution...</option>
                       {institutions.map((inst) => (
                         <option key={inst.id} value={inst.id}>
@@ -525,114 +299,34 @@ export function AccountDrawer({
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Original Amount
-                      </label>
-                      <input
-                        type="number"
-                        name="originalAmount"
-                        step="0.01"
-                        defaultValue={
-                          account?.type === 'loan' ? account.originalAmount : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Original Amount</label>
+                      <input type="number" name="originalAmount" step="0.01" defaultValue={account?.type === 'loan' ? account.originalAmount : ''} style={control} required />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Amount Owed
-                      </label>
-                      <input
-                        type="number"
-                        name="balance"
-                        step="0.01"
-                        defaultValue={
-                          account?.type === 'loan' ? Math.abs(account.balance) : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Amount Owed</label>
+                      <input type="number" name="balance" step="0.01" defaultValue={account?.type === 'loan' ? Math.abs(account.balance) : ''} style={control} required />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Interest Rate %
-                      </label>
-                      <input
-                        type="number"
-                        name="interestRate"
-                        step="0.01"
-                        defaultValue={
-                          account?.type === 'loan' ? account.interestRate : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Interest Rate %</label>
+                      <input type="number" name="interestRate" step="0.01" defaultValue={account?.type === 'loan' ? account.interestRate : ''} style={control} required />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Term (months)
-                      </label>
-                      <input
-                        type="number"
-                        name="termMonths"
-                        defaultValue={
-                          account?.type === 'loan' ? account.termMonths : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Term (months)</label>
+                      <input type="number" name="termMonths" defaultValue={account?.type === 'loan' ? account.termMonths : ''} style={control} required />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Payment Amount
-                      </label>
-                      <input
-                        type="number"
-                        name="paymentAmount"
-                        step="0.01"
-                        defaultValue={
-                          account?.type === 'loan' ? account.paymentAmount : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Payment Amount</label>
+                      <input type="number" name="paymentAmount" step="0.01" defaultValue={account?.type === 'loan' ? account.paymentAmount : ''} style={control} required />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Frequency
-                      </label>
-                      <select
-                        name="paymentFrequency"
-                        defaultValue={
-                          account?.type === 'loan' ? account.paymentFrequency : 'monthly'
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                      >
+                      <label style={label}>Frequency</label>
+                      <select name="paymentFrequency" defaultValue={account?.type === 'loan' ? account.paymentFrequency : 'monthly'} style={control}>
                         <option value="weekly">Weekly</option>
                         <option value="biweekly">Bi-weekly</option>
                         <option value="monthly">Monthly</option>
@@ -644,95 +338,33 @@ export function AccountDrawer({
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Origination Date
-                      </label>
-                      <input
-                        type="date"
-                        name="originationDate"
-                        defaultValue={
-                          account?.type === 'loan' ? account.originationDate || '' : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                      />
+                      <label style={label}>Origination Date</label>
+                      <input type="date" name="originationDate" defaultValue={account?.type === 'loan' ? account.originationDate || '' : ''} style={control} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Maturity Date
-                      </label>
-                      <input
-                        type="date"
-                        name="maturityDate"
-                        defaultValue={
-                          account?.type === 'loan' ? account.maturityDate : ''
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Maturity Date</label>
+                      <input type="date" name="maturityDate" defaultValue={account?.type === 'loan' ? account.maturityDate : ''} style={control} required />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Due Day (optional)
-                    </label>
-                    <input
-                      type="number"
-                      name="dueDay"
-                      min="1"
-                      max="31"
-                      defaultValue={
-                        account?.type === 'loan' ? account.dueDay || '' : ''
-                      }
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                 bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                 transition-colors"
-                    />
+                    <label style={label}>Due Day (optional)</label>
+                    <input type="number" name="dueDay" min="1" max="31" defaultValue={account?.type === 'loan' ? account.dueDay || '' : ''} style={control} />
                   </div>
                 </>
               )}
 
-              {/* Wallet specific fields */}
+              {/* Wallet */}
               {selectedType === 'wallet' && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Balance
-                      </label>
-                      <input
-                        type="number"
-                        name="balance"
-                        step="0.01"
-                        defaultValue={account?.balance || ''}
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                        required
-                      />
+                      <label style={label}>Balance</label>
+                      <input type="number" name="balance" step="0.01" defaultValue={account?.balance || ''} style={control} required />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Currency
-                      </label>
-                      <select
-                        name="currency"
-                        defaultValue={
-                          account?.type === 'wallet' ? account.currency : 'USD'
-                        }
-                        className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                   bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                   focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                   transition-colors"
-                      >
+                      <label style={label}>Currency</label>
+                      <select name="currency" defaultValue={account?.type === 'wallet' ? account.currency : 'USD'} style={control}>
                         <option value="USD">USD</option>
                         <option value="EUR">EUR</option>
                         <option value="GBP">GBP</option>
@@ -741,19 +373,8 @@ export function AccountDrawer({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Icon
-                    </label>
-                    <select
-                      name="icon"
-                      defaultValue={
-                        account?.type === 'wallet' ? account.icon : 'wallet'
-                      }
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600
-                                 bg-white dark:bg-slate-800 text-slate-900 dark:text-white
-                                 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-                                 transition-colors"
-                    >
+                    <label style={label}>Icon</label>
+                    <select name="icon" defaultValue={account?.type === 'wallet' ? account.icon : 'wallet'} style={control}>
                       <option value="wallet">Wallet</option>
                       <option value="briefcase">Briefcase</option>
                       <option value="piggybank">Piggy Bank</option>
@@ -762,44 +383,31 @@ export function AccountDrawer({
                 </>
               )}
 
-              {/* Linked Goals for Savings accounts (read-only display) */}
+              {/* Linked Goals (savings, read-only) */}
               {isEditing && account?.type === 'savings' && account.linkedGoals && account.linkedGoals.length > 0 && (
-                <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-                  <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                    Linked Goals
-                  </h3>
+                <div className="pt-4" style={{ borderTop: '1px solid var(--card-border)' }}>
+                  <h3 style={{ ...label, fontSize: 11 }}>Linked Goals</h3>
                   <div className="space-y-3">
                     {account.linkedGoals.map((goal) => {
-                      const progress = goal.targetAmount > 0
-                        ? Math.round((goal.currentBalance / goal.targetAmount) * 100)
-                        : 0
+                      const progress = goal.targetAmount > 0 ? Math.round((goal.currentBalance / goal.targetAmount) * 100) : 0
                       return (
                         <div key={goal.id} className="space-y-1.5">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-slate-700 dark:text-slate-300 font-medium">
-                              {goal.name}
-                            </span>
-                            <span className="text-slate-500 dark:text-slate-400">
+                          <div className="flex justify-between" style={{ fontFamily: 'var(--font-sans)', fontSize: 13 }}>
+                            <span style={{ color: 'var(--fg)', fontWeight: 500 }}>{goal.name}</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg3)' }}>
                               {formatCurrency(goal.currentBalance)} / {formatCurrency(goal.targetAmount)}
                             </span>
                           </div>
-                          <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-emerald-500 rounded-full"
-                              style={{ width: `${Math.min(progress, 100)}%` }}
-                            />
+                          <div className="h-1.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                            <div className="h-full rounded-full" style={{ width: `${Math.min(progress, 100)}%`, background: 'var(--accent-gradient)' }} />
                           </div>
                         </div>
                       )
                     })}
                     {account.unallocatedBalance !== undefined && (
-                      <div className="flex justify-between text-sm pt-2 border-t border-slate-100 dark:border-slate-700">
-                        <span className="text-slate-500 dark:text-slate-400">
-                          Personal savings
-                        </span>
-                        <span className="text-slate-700 dark:text-slate-300 font-medium">
-                          {formatCurrency(account.unallocatedBalance)}
-                        </span>
+                      <div className="flex justify-between pt-2" style={{ borderTop: '1px solid var(--card-border)', fontFamily: 'var(--font-sans)', fontSize: 13 }}>
+                        <span style={{ color: 'var(--fg3)' }}>Personal savings</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg)', fontWeight: 500 }}>{formatCurrency(account.unallocatedBalance)}</span>
                       </div>
                     )}
                   </div>
@@ -808,53 +416,26 @@ export function AccountDrawer({
             </div>
 
             {/* Footer */}
-            <div className="sticky bottom-0 flex items-center justify-between gap-3 px-6 py-4
-                            border-t border-slate-200 dark:border-slate-800
-                            bg-slate-50 dark:bg-slate-900">
+            <div className="sticky bottom-0 flex items-center justify-between gap-3 px-6 py-4" style={{ borderTop: '1px solid var(--card-border)', background: 'var(--bg2)' }}>
               {isEditing && !isArchived ? (
-                <button
-                  type="button"
-                  onClick={() => onDelete?.(account.id)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg
-                             text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20
-                             transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
+                <Button type="button" variant="danger" icon={Trash2} onClick={() => onDelete?.(account.id)}>
                   Delete
-                </button>
+                </Button>
               ) : isEditing && isArchived ? (
-                <button
-                  type="button"
-                  onClick={() => onRestore?.(account.id)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg
-                             text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20
-                             transition-colors"
-                >
-                  <RotateCcw className="w-4 h-4" />
+                <Button type="button" variant="accent" icon={RotateCcw} onClick={() => onRestore?.(account.id)}>
                   Restore
-                </button>
+                </Button>
               ) : (
                 <div />
               )}
 
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-400
-                             hover:bg-slate-100 dark:hover:bg-slate-800
-                             transition-colors"
-                >
+                <Button type="button" variant="secondary" onClick={onClose}>
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-lg bg-emerald-600 text-white font-medium
-                             hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2
-                             dark:focus:ring-offset-slate-900 transition-colors"
-                >
+                </Button>
+                <Button type="submit" variant="primary">
                   {isEditing ? 'Save Changes' : 'Create Account'}
-                </button>
+                </Button>
               </div>
             </div>
           </form>

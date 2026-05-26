@@ -11,25 +11,18 @@ describe('MainNav', () => {
     { label: 'Accounts', href: '/accounts', Icon: Wallet, isActive: false },
   ]
 
-  it('renders all navigation items', () => {
+  it('renders all navigation items when expanded', () => {
     render(<MainNav items={defaultItems} isCollapsed={false} />)
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
     expect(screen.getByText('Transactions')).toBeInTheDocument()
     expect(screen.getByText('Accounts')).toBeInTheDocument()
   })
 
-  it('hides inline labels when collapsed (only tooltips remain)', () => {
+  it('hides inline labels when collapsed and exposes them as link titles', () => {
     render(<MainNav items={defaultItems} isCollapsed={true} />)
-    // When collapsed, the label <span> is not rendered, but a tooltip <span> still exists.
-    // The tooltip is pointer-events-none and opacity-0 (visually hidden).
-    const dashboardElements = screen.queryAllByText('Dashboard')
-    dashboardElements.forEach((el) => {
-      expect(el.className).toContain('pointer-events-none')
-    })
-    const transactionsElements = screen.queryAllByText('Transactions')
-    transactionsElements.forEach((el) => {
-      expect(el.className).toContain('pointer-events-none')
-    })
+    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
+    expect(screen.getByTitle('Dashboard')).toBeInTheDocument()
+    expect(screen.getByTitle('Transactions')).toBeInTheDocument()
   })
 
   it('calls onNavigate when a nav item is clicked', async () => {
@@ -41,28 +34,22 @@ describe('MainNav', () => {
     expect(onNavigate).toHaveBeenCalledWith('/transactions')
   })
 
-  it('applies active styling to the active item', () => {
+  it('applies accent color to the active item', () => {
     render(<MainNav items={defaultItems} isCollapsed={false} />)
     const dashboardLink = screen.getByText('Dashboard').closest('a')
-    expect(dashboardLink?.className).toContain('text-emerald-700')
+    expect(dashboardLink?.style.color).toBe('var(--accent-a)')
   })
 
-  it('does not apply active styling to inactive items', () => {
+  it('does not apply accent color to inactive items', () => {
     render(<MainNav items={defaultItems} isCollapsed={false} />)
     const transactionsLink = screen.getByText('Transactions').closest('a')
-    expect(transactionsLink?.className).not.toContain('text-emerald-700')
+    expect(transactionsLink?.style.color).not.toBe('var(--accent-a)')
   })
 
-  it('renders tooltips when collapsed', () => {
-    render(<MainNav items={defaultItems} isCollapsed={true} />)
-    // Tooltips are rendered but hidden via opacity-0
-    const tooltips = document.querySelectorAll('.opacity-0')
-    expect(tooltips.length).toBeGreaterThan(0)
-  })
-
-  it('shows active indicator bar on active item', () => {
+  it('renders a glowing indicator bar on the active item', () => {
     render(<MainNav items={defaultItems} isCollapsed={false} />)
-    const activeIndicator = document.querySelector('.bg-emerald-600')
-    expect(activeIndicator).toBeInTheDocument()
+    const dashboardLink = screen.getByText('Dashboard').closest('a')
+    const indicator = dashboardLink?.querySelector('span')
+    expect(indicator?.style.boxShadow).toContain('--accent-solid')
   })
 })

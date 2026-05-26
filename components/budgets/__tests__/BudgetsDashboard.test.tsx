@@ -51,7 +51,8 @@ describe('BudgetsDashboard', () => {
     it('displays Total Spent amount', () => {
       render(<BudgetsDashboard {...defaultProps} />)
       expect(screen.getByText('Total Spent')).toBeInTheDocument()
-      expect(screen.getByText('$3,124.67')).toBeInTheDocument()
+      // Spent shows both as the hero headline and the breakdown stat
+      expect(screen.getAllByText('$3,124.67').length).toBeGreaterThanOrEqual(1)
     })
 
     it('displays Remaining amount', () => {
@@ -89,11 +90,12 @@ describe('BudgetsDashboard', () => {
   // 4. Filter Controls
   // ---------------------------------------------------------------------------
   describe('Filter Controls', () => {
-    it('renders the type filter dropdown', () => {
+    it('renders the type filter segmented tabs', () => {
       render(<BudgetsDashboard {...defaultProps} />)
-      const typeLabel = screen.getByText('Type:')
-      const select = typeLabel.parentElement?.querySelector('select')
-      expect(select).toBeInTheDocument()
+      // Type is a segmented control (All / Monthly / Sinking funds) in the Vault theme.
+      // ("All" is intentionally not asserted — it also labels a chart time-range button.)
+      expect(screen.getByText('Monthly')).toBeInTheDocument()
+      expect(screen.getByText('Sinking funds')).toBeInTheDocument()
     })
 
     it('renders the sort field dropdown', () => {
@@ -103,13 +105,11 @@ describe('BudgetsDashboard', () => {
       expect(select).toBeInTheDocument()
     })
 
-    it('calls onFilterChange when type filter changes', async () => {
+    it('calls onFilterChange when a type tab is clicked', async () => {
       const user = userEvent.setup()
       const onFilterChange = vi.fn()
       render(<BudgetsDashboard {...defaultProps} onFilterChange={onFilterChange} />)
-      const typeLabel = screen.getByText('Type:')
-      const select = typeLabel.parentElement?.querySelector('select')
-      await user.selectOptions(select!, 'monthly')
+      await user.click(screen.getByText('Monthly'))
       expect(onFilterChange).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'monthly' })
       )
@@ -147,8 +147,8 @@ describe('BudgetsDashboard', () => {
 
     it('renders budget progress percentages', () => {
       render(<BudgetsDashboard {...defaultProps} />)
-      // Food & Dining: 623.45 / 800 = 78%
-      expect(screen.getByText('78%')).toBeInTheDocument()
+      // Food & Dining: 623.45 / 800 = 78% used (card footer)
+      expect(screen.getByText('78% used')).toBeInTheDocument()
     })
   })
 

@@ -77,18 +77,20 @@ describe('AccountCard', () => {
   // 2. Balance Change Indicators
   // ---------------------------------------------------------------------------
   describe('Balance Change Indicators', () => {
-    it('shows positive change with +prefix and emerald color', () => {
+    it('shows positive change with +prefix and good color', () => {
       render(<AccountCard account={checkingAccount} />)
       expect(screen.getByText('+$425.00')).toBeInTheDocument()
       const changeEl = screen.getByText('+$425.00')
-      expect(changeEl.className).toContain('emerald')
+      // Vault theme: positive change uses the --good token color
+      expect(changeEl.style.color).toBe('var(--good)')
     })
 
-    it('shows negative change with -prefix and rose color', () => {
+    it('shows negative change with -prefix and bad color', () => {
       render(<AccountCard account={checkingAccountNegativeChange} />)
       expect(screen.getByText('-$340.25')).toBeInTheDocument()
       const changeEl = screen.getByText('-$340.25')
-      expect(changeEl.className).toContain('rose')
+      // Vault theme: negative change uses the --bad token color
+      expect(changeEl.style.color).toBe('var(--bad)')
     })
 
     it('shows "No change" for zero change', () => {
@@ -121,11 +123,12 @@ describe('AccountCard', () => {
       expect(screen.getByText('••••4521')).toBeInTheDocument()
     })
 
-    it('shows negative balance in rose color', () => {
+    it('shows negative balance in bad color', () => {
       render(<AccountCard account={creditCardAccount} />)
       // Negative balances use accounting notation: ($1,245.80), not -$1,245.80.
       const balanceEl = screen.getByText(/\(\$1,245.80\)/)
-      expect(balanceEl.className).toContain('rose')
+      // Vault theme: negative balance uses the --bad token color (inline style)
+      expect(balanceEl.style.color).toBe('var(--bad)')
     })
   })
 
@@ -138,11 +141,12 @@ describe('AccountCard', () => {
       expect(screen.getByText('BAC Credomatic')).toBeInTheDocument()
     })
 
-    it('shows negative balance in rose color', () => {
+    it('shows negative balance in bad color', () => {
       render(<AccountCard account={loanAccount} />)
       // Negative balances use accounting notation: ($8,750.00), not -$8,750.00.
       const balanceEl = screen.getByText(/\(\$8,750.00\)/)
-      expect(balanceEl.className).toContain('rose')
+      // Vault theme: negative balance uses the --bad token color (inline style)
+      expect(balanceEl.style.color).toBe('var(--bad)')
     })
 
     it('shows progress bar with correct percentage', () => {

@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import type { Transaction, Category, Account } from './types'
-import { MoreHorizontal, Pencil, Trash2, MessageCircle, Mail, Edit3, Upload } from 'lucide-react'
+import { MoreHorizontal, Pencil, Trash2, MessageCircle, Mail, Edit3, Upload, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
+import { categoryHex } from './categoryColor'
 import { formatCurrency } from '@/lib/fx'
 
 interface TransactionRowProps {
@@ -18,22 +19,8 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
-    year: 'numeric'
+    year: 'numeric',
   })
-}
-
-// Map category colors to Tailwind classes
-const categoryColorMap: Record<string, { bg: string; text: string }> = {
-  emerald: { bg: 'bg-emerald-100 dark:bg-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-400' },
-  teal: { bg: 'bg-teal-100 dark:bg-teal-900/40', text: 'text-teal-700 dark:text-teal-400' },
-  amber: { bg: 'bg-amber-100 dark:bg-amber-900/40', text: 'text-amber-700 dark:text-amber-400' },
-  orange: { bg: 'bg-orange-100 dark:bg-orange-900/40', text: 'text-orange-700 dark:text-orange-400' },
-  sky: { bg: 'bg-sky-100 dark:bg-sky-900/40', text: 'text-sky-700 dark:text-sky-400' },
-  violet: { bg: 'bg-violet-100 dark:bg-violet-900/40', text: 'text-violet-700 dark:text-violet-400' },
-  pink: { bg: 'bg-pink-100 dark:bg-pink-900/40', text: 'text-pink-700 dark:text-pink-400' },
-  rose: { bg: 'bg-rose-100 dark:bg-rose-900/40', text: 'text-rose-700 dark:text-rose-400' },
-  red: { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-400' },
-  indigo: { bg: 'bg-indigo-100 dark:bg-indigo-900/40', text: 'text-indigo-700 dark:text-indigo-400' },
 }
 
 const sourceIcons: Record<string, typeof Edit3> = {
@@ -50,17 +37,10 @@ const sourceLabels: Record<string, string> = {
   import: 'Imported',
 }
 
-export function TransactionRow({
-  transaction,
-  category,
-  account,
-  onEdit,
-  onDelete,
-}: TransactionRowProps) {
+export function TransactionRow({ transaction, category, account, onEdit, onDelete }: TransactionRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Close menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -72,24 +52,45 @@ export function TransactionRow({
   }, [])
 
   const isIncome = transaction.amount > 0
-  const colorClasses = categoryColorMap[category.color] || categoryColorMap.emerald
+  const hex = categoryHex(category.color)
   const SourceIcon = sourceIcons[transaction.source] ?? Edit3
 
   return (
-    <tr className="group border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-700/50 dark:hover:bg-slate-800/50">
+    <tr
+      className="group"
+      style={{ borderTop: '1px solid var(--card-border)', transition: 'background .12s' }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+    >
       {/* Date */}
-      <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-600 dark:text-slate-400">
+      <td className="whitespace-nowrap px-4 py-3.5" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg3)' }}>
         {formatDate(transaction.date)}
       </td>
 
-      {/* Description */}
+      {/* Description (with leading direction icon + source hint) */}
       <td className="px-4 py-3.5">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+        <div className="flex items-center gap-3">
+          <span
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              flexShrink: 0,
+              background: isIncome ? 'rgba(74,222,128,0.12)' : 'var(--accent-soft)',
+              color: isIncome ? 'var(--good)' : 'var(--accent-a)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {isIncome ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
+          </span>
+          <p className="truncate" style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>
             {transaction.description}
           </p>
           <div
-            className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-slate-400 opacity-0 transition-opacity group-hover:opacity-100"
+            className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100"
+            style={{ color: 'var(--fg3)' }}
             title={`Source: ${sourceLabels[transaction.source] ?? transaction.source}`}
           >
             <SourceIcon className="h-3.5 w-3.5" />
@@ -97,51 +98,67 @@ export function TransactionRow({
         </div>
       </td>
 
-      {/* Category (Colored Pill) */}
+      {/* Category (soft pill) */}
       <td className="px-4 py-3.5">
-        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${colorClasses.bg} ${colorClasses.text}`}>
+        <span
+          className="inline-flex items-center gap-1.5 rounded-full"
+          style={{ padding: '4px 10px', background: `${hex}22`, color: hex, fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500 }}
+        >
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: hex }} />
           {category.name}
         </span>
       </td>
 
       {/* Account */}
-      <td className="px-4 py-3.5 text-sm text-slate-600 dark:text-slate-400">
+      <td className="px-4 py-3.5" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg2)' }}>
         {account.name}
       </td>
 
-      {/* Amount (Color-coded) */}
+      {/* Amount */}
       <td className="whitespace-nowrap px-4 py-3.5 text-right">
-        <span className={`font-[JetBrains_Mono,monospace] text-sm font-semibold ${
-          isIncome
-            ? 'text-emerald-600 dark:text-emerald-400'
-            : 'text-red-600 dark:text-red-400'
-        }`}>
-          {isIncome ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount), transaction.currency)}
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: isIncome ? 'var(--good)' : 'var(--fg)' }}>
+          {isIncome ? '+' : '-'}
+          {formatCurrency(Math.abs(transaction.amount), transaction.currency)}
         </span>
       </td>
 
-      {/* Actions Menu */}
+      {/* Actions */}
       <td className="relative px-4 py-3.5">
         <div ref={menuRef} className="flex justify-end">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 opacity-0 transition-all hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+            aria-label="Transaction actions"
+            className="flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition-all group-hover:opacity-100"
+            style={{ color: 'var(--fg3)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             <MoreHorizontal className="h-4 w-4" />
           </button>
 
           {menuOpen && (
-            <div className="absolute right-4 top-full z-10 mt-1 w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+            <div
+              className="absolute right-4 top-full z-10 mt-1 w-36 py-1"
+              style={{ background: 'var(--bg2)', border: '1px solid var(--card-border)', borderRadius: 12, boxShadow: '0 30px 80px -30px rgba(0,0,0,0.7)' }}
+            >
               <button
-                onClick={() => { onEdit?.(); setMenuOpen(false) }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+                onClick={() => {
+                  onEdit?.()
+                  setMenuOpen(false)
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg2)' }}
               >
                 <Pencil className="h-4 w-4" />
                 Edit
               </button>
               <button
-                onClick={() => { onDelete?.(); setMenuOpen(false) }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                onClick={() => {
+                  onDelete?.()
+                  setMenuOpen(false)
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--bad)' }}
               >
                 <Trash2 className="h-4 w-4" />
                 Delete

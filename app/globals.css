@@ -1,25 +1,70 @@
 @import "tailwindcss";
 
+/* ─── Vault theme · dark-only, Sky accent ─────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
+  /* tone-of-meaning colors */
+  --bg:   #0b0d18;
+  --bg2:  #0e1124;
+  --fg:   #f1f0f5;
+  --fg2:  #a5a3b8;
+  --fg3:  #6e6c83;
+  --fg4:  #4a4960;
+  --good: #4ade80;
+  --bad:  #fb7185;
+  --warn: #fbbf24;
+  --info: #67e8f9;
+
+  /* accent · Sky */
+  --accent-a:     #7dd3fc;
+  --accent-b:     #0284c7;
+  --accent-solid: #0ea5e9;
+  --accent-soft:  rgba(125, 211, 252, 0.16);
+  --accent-gradient: linear-gradient(135deg, var(--accent-b), var(--accent-a));
+
+  /* glassy card surface */
+  --card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)), #161a2b;
+  --card-border:    rgba(255, 255, 255, 0.06);
+  --card-border-hi: rgba(255, 255, 255, 0.10);
+  --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 20px 40px -28px rgba(0, 0, 0, 0.6);
+  --card-radius: 18px;
+
+  /* hairline used across surfaces */
+  --hairline: rgba(255, 255, 255, 0.06);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --color-bg:   var(--bg);
+  --color-bg2:  var(--bg2);
+  --color-fg:   var(--fg);
+  --color-fg2:  var(--fg2);
+  --color-fg3:  var(--fg3);
+  --color-fg4:  var(--fg4);
+  --color-good: var(--good);
+  --color-bad:  var(--bad);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+
+  --color-accent:       var(--accent-a);
+  --color-accent-b:     var(--accent-b);
+  --color-accent-solid: var(--accent-solid);
+  --color-accent-soft:  var(--accent-soft);
+
+  --color-card:    var(--card-border);
+  --color-card-hi: var(--card-border-hi);
+
+  /* keep legacy aliases so untouched (Phase 2) screens stay legible on dark */
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+
+  --font-display: var(--font-geist), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --radius-card: var(--card-radius);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0f172a;
-    --foreground: #f1f5f9;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--fg);
 }

@@ -1,23 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import type {
-  Account,
-  AccountsProps,
-  AccountType,
-} from './types'
+import type { Account, AccountsProps, AccountType } from './types'
 import { AccountCard } from './AccountCard'
 import { AccountDrawer } from './AccountDrawer'
 import { formatCurrency } from '@/lib/fx'
-import {
-  Plus,
-  Landmark,
-  CreditCard,
-  Building2,
-  Wallet,
-  TrendingUp,
-  TrendingDown,
-} from 'lucide-react'
+import { Card, Button } from '@/components/ui'
+import { Plus, Landmark, CreditCard, Building2, Wallet, TrendingUp, TrendingDown } from 'lucide-react'
 
 type AccountCategory = {
   key: AccountType[]
@@ -41,35 +30,32 @@ function sumUsd(accounts: Account[]): number {
 
 function groupAccountsByCategory(accounts: Account[]): Map<string, Account[]> {
   const grouped = new Map<string, Account[]>()
-
   for (const category of categories) {
-    const categoryAccounts = accounts.filter((acc) =>
-      category.key.includes(acc.type)
-    )
-    if (categoryAccounts.length > 0) {
-      grouped.set(category.label, categoryAccounts)
-    }
+    const categoryAccounts = accounts.filter((acc) => category.key.includes(acc.type))
+    if (categoryAccounts.length > 0) grouped.set(category.label, categoryAccounts)
   }
-
   return grouped
 }
 
 function countAccountsByType(accounts: Account[]): { label: string; count: number }[] {
   const counts: { label: string; count: number }[] = []
-
-  const bankAccounts = accounts.filter(
-    (acc) => acc.type === 'checking' || acc.type === 'savings'
-  ).length
+  const bankAccounts = accounts.filter((acc) => acc.type === 'checking' || acc.type === 'savings').length
   const creditCards = accounts.filter((acc) => acc.type === 'credit_card').length
   const loans = accounts.filter((acc) => acc.type === 'loan').length
   const wallets = accounts.filter((acc) => acc.type === 'wallet').length
-
   if (bankAccounts > 0) counts.push({ label: 'Bank Accounts', count: bankAccounts })
   if (creditCards > 0) counts.push({ label: 'Credit Cards', count: creditCards })
   if (loans > 0) counts.push({ label: 'Loans', count: loans })
   if (wallets > 0) counts.push({ label: 'Wallets', count: wallets })
-
   return counts
+}
+
+const eyebrow: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: 'var(--fg3)',
 }
 
 export function AccountsView({
@@ -89,9 +75,6 @@ export function AccountsView({
   const [selectedAccount, setSelectedAccount] = useState<Account | undefined>()
 
   const groupedAccounts = groupAccountsByCategory(accounts)
-  // Headline = cash-only (bank + wallet − credit/loan), USD-converted.
-  // Investment accounts are excluded from the Accounts page entirely (kept in DB
-  // for a future dedicated assets page).
   const cashAccounts = accounts.filter((acc) => acc.type !== 'investment')
   const cashTotalUsd = sumUsd(cashAccounts)
   const accountCounts = countAccountsByType(accounts)
@@ -130,87 +113,67 @@ export function AccountsView({
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl p-4 md:p-6 lg:px-8 lg:py-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Accounts
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Manage your financial accounts
-          </p>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }}>Accounts</h1>
+          <p style={{ marginTop: 4, fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg3)' }}>Manage your financial accounts</p>
         </div>
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer">
+          <label className="flex cursor-pointer items-center gap-2" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg2)' }}>
             <input
               type="checkbox"
               checked={showArchived || false}
               onChange={() => onToggleArchived?.()}
-              className="w-4 h-4 rounded border-slate-300 text-emerald-600
-                         focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-800"
+              className="h-4 w-4 rounded"
+              style={{ accentColor: 'var(--accent-solid)' }}
             />
             Show Archived
           </label>
-          <button
-            onClick={handleCreateClick}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5
-                       bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg
-                       shadow-sm shadow-emerald-600/20 hover:shadow-emerald-600/30
-                       transition-all duration-200
-                       focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2
-                       dark:focus:ring-offset-slate-900"
-          >
-            <Plus className="w-5 h-5" />
+          <Button variant="primary" icon={Plus} onClick={handleCreateClick}>
             New Account
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Summary Card */}
+      {/* Summary hero */}
       {accounts.length > 0 && (
-        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl p-6 mb-8
-                        shadow-lg shadow-emerald-600/20">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <Card accent pad={24} style={{ marginBottom: 32, overflow: 'hidden' }}>
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-emerald-100 text-sm font-medium mb-1">
-                Cash Balance (USD)
-              </p>
-              <p className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+              <p style={eyebrow}>Cash Balance (USD)</p>
+              <p style={{ marginTop: 8, fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--fg)' }}>
                 {formatCurrency(cashTotalUsd, 'USD', { accounting: true })}
               </p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2">
               {accountCounts.map(({ label, count }) => (
-                <div
+                <span
                   key={label}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full
-                             bg-white/10 backdrop-blur-sm"
+                  className="inline-flex items-center gap-2 rounded-full px-3 py-1.5"
+                  style={{ background: 'rgba(255,255,255,0.06)', fontFamily: 'var(--font-sans)', fontSize: 12 }}
                 >
-                  <span className="text-emerald-100 text-sm">{label}</span>
-                  <span className="text-white font-semibold">{count}</span>
-                </div>
+                  <span style={{ color: 'var(--fg2)' }}>{label}</span>
+                  <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{count}</span>
+                </span>
               ))}
             </div>
           </div>
 
-          {/* Net Worth Trend */}
-          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-emerald-500/30">
-            {netWorthChange >= 0 ? (
-              <TrendingUp className="w-4 h-4 text-emerald-200" />
-            ) : (
-              <TrendingDown className="w-4 h-4 text-emerald-200" />
-            )}
-            <span className="text-emerald-100 text-sm">
+          {/* Net worth trend */}
+          <div className="mt-4 flex items-center gap-2 pt-4" style={{ borderTop: '1px solid var(--card-border)' }}>
+            {netWorthChange >= 0 ? <TrendingUp className="h-4 w-4" style={{ color: 'var(--good)' }} /> : <TrendingDown className="h-4 w-4" style={{ color: 'var(--bad)' }} />}
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg2)' }}>
               Net worth {netWorthChange >= 0 ? 'up' : 'down'}{' '}
-              <span className="text-white font-medium">
-                {netWorthChange >= 0 ? '+' : ''}{formatCurrency(netWorthChange)}
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: netWorthChange >= 0 ? 'var(--good)' : 'var(--bad)' }}>
+                {netWorthChange >= 0 ? '+' : ''}
+                {formatCurrency(netWorthChange)}
               </span>{' '}
               this month
             </span>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Account Groups */}
@@ -218,36 +181,26 @@ export function AccountsView({
         {categories.map((category) => {
           const categoryAccounts = groupedAccounts.get(category.label)
           if (!categoryAccounts || categoryAccounts.length === 0) return null
-
           const CategoryIcon = category.icon
 
           return (
             <section key={category.label}>
               {/* Category Header */}
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg
-                                bg-slate-100 dark:bg-slate-800">
-                  <CategoryIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--fg2)' }}>
+                  <CategoryIcon className="h-4 w-4" />
                 </div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  {category.label}
-                </h2>
-                <span className="text-sm text-slate-400 dark:text-slate-500">
-                  ({categoryAccounts.length})
-                </span>
-                <span className="ml-auto text-sm font-medium text-slate-500 dark:text-slate-400">
+                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, color: 'var(--fg)' }}>{category.label}</h2>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg4)' }}>({categoryAccounts.length})</span>
+                <span className="ml-auto" style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--fg2)' }}>
                   {formatCurrency(sumUsd(categoryAccounts), 'USD', { accounting: true })}
                 </span>
               </div>
 
               {/* Account Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {categoryAccounts.map((account) => (
-                  <AccountCard
-                    key={account.id}
-                    account={account}
-                    onClick={() => handleCardClick(account)}
-                  />
+                  <AccountCard key={account.id} account={account} onClick={() => handleCardClick(account)} />
                 ))}
               </div>
             </section>
@@ -258,25 +211,16 @@ export function AccountsView({
       {/* Empty State */}
       {accounts.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800
-                          flex items-center justify-center mb-4">
-            <Wallet className="w-8 h-8 text-slate-400" />
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--fg3)' }}>
+            <Wallet className="h-8 w-8" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-            No accounts yet
-          </h3>
-          <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-sm">
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--fg)', marginBottom: 8 }}>No accounts yet</h3>
+          <p style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--fg3)', maxWidth: 360, marginBottom: 24 }}>
             Add your bank accounts, credit cards, loans, and cash to start tracking your finances.
           </p>
-          <button
-            onClick={handleCreateClick}
-            className="inline-flex items-center gap-2 px-4 py-2.5
-                       bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg
-                       transition-colors"
-          >
-            <Plus className="w-5 h-5" />
+          <Button variant="primary" icon={Plus} onClick={handleCreateClick}>
             Add Your First Account
-          </button>
+          </Button>
         </div>
       )}
 
