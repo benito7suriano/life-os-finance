@@ -112,7 +112,8 @@ describe('TransactionModal', () => {
     it('defaults to Expense tab', () => {
       render(<TransactionModal {...defaultModalProps} />)
       const expenseTab = screen.getByText('Expense')
-      expect(expenseTab.closest('button')).toHaveClass('bg-white')
+      // Active tab is indicated by the accent color (Vault theme)
+      expect(expenseTab.closest('button')?.style.color).toBe('var(--accent-a)')
     })
 
     it('switches to Income tab when clicked', async () => {
@@ -121,7 +122,7 @@ describe('TransactionModal', () => {
       await user.click(screen.getByText('Income'))
       // Should show income categories
       const incomeTab = screen.getByText('Income')
-      expect(incomeTab.closest('button')).toHaveClass('bg-white')
+      expect(incomeTab.closest('button')?.style.color).toBe('var(--accent-a)')
     })
 
     it('shows account fields when in Transfer tab', async () => {
