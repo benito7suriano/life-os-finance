@@ -14,6 +14,8 @@ export interface Account {
   name: string
   type: 'checking' | 'savings' | 'credit_card' | 'wallet'
   icon: string
+  /** Native currency of this account (e.g. 'USD', 'DOP'). */
+  currency?: string
 }
 
 /** Goal summary for transfer modal (linked to a savings account) */
@@ -40,7 +42,16 @@ export interface Transaction {
   fromAccountId?: string
   /** For transfers: the destination account */
   toAccountId?: string
+  /** Signed amount in the transaction's native currency — for display only. */
   amount: number
+  /** Native currency of this transaction (e.g. 'USD', 'DOP'). */
+  currency: string
+  /** USD-converted signed amount, computed at the API boundary. Aggregate THIS, never `amount`. */
+  amountUsd: number
+  /** For cross-currency transfers: amount credited to the destination, in `toCurrency`. */
+  toAmount?: number
+  /** For cross-currency transfers: currency of the destination leg. */
+  toCurrency?: string
   type: 'income' | 'expense' | 'transfer'
   source: 'manual' | 'whatsapp' | 'email'
   /** For transfers with goal contributions: the allocation breakdown */
@@ -70,8 +81,10 @@ export interface TransactionFilters {
 
 export interface TransactionSummary {
   count: number
-  totalIncome: number
-  totalExpenses: number
+  /** Total income for the filtered view, converted to USD. */
+  totalIncomeUsd: number
+  /** Total expenses for the filtered view, converted to USD. */
+  totalExpensesUsd: number
 }
 
 // =============================================================================
@@ -156,6 +169,10 @@ export interface TransactionFormData {
   accountId?: string
   fromAccountId?: string
   toAccountId?: string
+  /** Cross-currency transfer: amount credited to the destination, in `toCurrency`. */
+  toAmount?: number
+  /** Cross-currency transfer: currency of the destination account. */
+  toCurrency?: string
   contributeToGoals?: boolean
   allocationMode?: AllocationMode
   manualAllocations?: Record<string, number>

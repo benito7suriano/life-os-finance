@@ -22,6 +22,8 @@ const sampleEditTransaction: Transaction = {
   categoryId: 'cat-003',
   accountId: 'acc-003',
   amount: -87.45,
+  currency: 'USD',
+  amountUsd: -87.45,
   type: 'expense',
   source: 'whatsapp',
 }

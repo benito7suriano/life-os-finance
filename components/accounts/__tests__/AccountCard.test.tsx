@@ -40,6 +40,40 @@ describe('AccountCard', () => {
   })
 
   // ---------------------------------------------------------------------------
+  // 1b. Multi-currency display (native primary, USD secondary)
+  // ---------------------------------------------------------------------------
+  describe('Multi-currency display', () => {
+    // A DOP account: native balance is what the user sees on their bank
+    // statement; balanceUsd is precomputed at the API boundary (252822 / 59).
+    const dopAccount = {
+      ...checkingAccount,
+      id: 'acc-dop',
+      name: 'Banco Popular DOP',
+      balance: 252822,
+      currency: 'DOP',
+      balanceUsd: 4285.12,
+      balanceChange: 0,
+      balanceChangeUsd: 0,
+    } as Account
+
+    it('renders the native DOP balance, currency-labeled (not a bare $)', () => {
+      render(<AccountCard account={dopAccount} />)
+      // ICU may render "RD$252,822.00" or "DOP 252,822.00" depending on runtime.
+      expect(screen.getByText(/(RD\$|DOP\s)252,822\.00/)).toBeInTheDocument()
+    })
+
+    it('renders the USD equivalent as a secondary line', () => {
+      render(<AccountCard account={dopAccount} />)
+      expect(screen.getByText('≈ $4,285.12')).toBeInTheDocument()
+    })
+
+    it('does NOT show a USD secondary line for USD accounts', () => {
+      render(<AccountCard account={checkingAccount} />)
+      expect(screen.queryByText(/^≈/)).not.toBeInTheDocument()
+    })
+  })
+
+  // ---------------------------------------------------------------------------
   // 2. Balance Change Indicators
   // ---------------------------------------------------------------------------
   describe('Balance Change Indicators', () => {
@@ -89,10 +123,12 @@ describe('AccountCard', () => {
       expect(screen.getByText('••••4521')).toBeInTheDocument()
     })
 
-    it('shows negative balance in rose color', () => {
+    it('shows negative balance in bad color', () => {
       render(<AccountCard account={creditCardAccount} />)
-      const balanceEl = screen.getByText(/-\$1,245.80/)
-      expect(balanceEl.className).toContain('rose')
+      // Negative balances use accounting notation: ($1,245.80), not -$1,245.80.
+      const balanceEl = screen.getByText(/\(\$1,245.80\)/)
+      // Vault theme: negative balance uses the --bad token color (inline style)
+      expect(balanceEl.style.color).toBe('var(--bad)')
     })
   })
 
@@ -105,10 +141,12 @@ describe('AccountCard', () => {
       expect(screen.getByText('BAC Credomatic')).toBeInTheDocument()
     })
 
-    it('shows negative balance in rose color', () => {
+    it('shows negative balance in bad color', () => {
       render(<AccountCard account={loanAccount} />)
-      const balanceEl = screen.getByText(/-\$8,750.00/)
-      expect(balanceEl.className).toContain('rose')
+      // Negative balances use accounting notation: ($8,750.00), not -$8,750.00.
+      const balanceEl = screen.getByText(/\(\$8,750.00\)/)
+      // Vault theme: negative balance uses the --bad token color (inline style)
+      expect(balanceEl.style.color).toBe('var(--bad)')
     })
 
     it('shows progress bar with correct percentage', () => {

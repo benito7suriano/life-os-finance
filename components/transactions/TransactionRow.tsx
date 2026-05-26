@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import type { Transaction, Category, Account } from './types'
 import { MoreHorizontal, Pencil, Trash2, MessageCircle, Mail, Edit3, Upload, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { categoryHex } from './categoryColor'
+import { formatCurrency } from '@/lib/fx'
 
 interface TransactionRowProps {
   transaction: Transaction
@@ -11,15 +12,6 @@ interface TransactionRowProps {
   account: Account
   onEdit?: () => void
   onDelete?: () => void
-}
-
-function formatCurrency(amount: number): string {
-  const absAmount = Math.abs(amount)
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(absAmount)
 }
 
 function formatDate(dateStr: string): string {
@@ -126,7 +118,7 @@ export function TransactionRow({ transaction, category, account, onEdit, onDelet
       <td className="whitespace-nowrap px-4 py-3.5 text-right">
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: isIncome ? 'var(--good)' : 'var(--fg)' }}>
           {isIncome ? '+' : '-'}
-          {formatCurrency(transaction.amount)}
+          {formatCurrency(Math.abs(transaction.amount), transaction.currency)}
         </span>
       </td>
 

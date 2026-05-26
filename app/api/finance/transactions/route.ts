@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createFinanceClient } from '@/lib/supabase/server'
+import { toUsd, fromUsd } from '@/lib/fx'
 
 export async function GET(request: NextRequest) {
   const supabase = await createFinanceClient()
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
   // Compute summary from a separate query (unfiltered or filtered)
   let summaryQuery = supabase
     .from('transactions')
-    .select('type, amount')
+    .select('type, amount, currency')
     .eq('user_id', user.id)
 
   if (search) summaryQuery = summaryQuery.ilike('description', `%${search}%`)
@@ -103,33 +104,45 @@ export async function GET(request: NextRequest) {
 
   const { data: summaryData } = await summaryQuery
 
+  // Totals must be currency-normalized: summing raw amounts across USD + DOP
+  // rows is meaningless. `*Usd` fields are authoritative; the UI displays those.
   const summary = (summaryData || []).reduce(
     (acc, t) => {
       acc.count++
-      const amount = Number(t.amount)
-      if (t.type === 'income') acc.totalIncome += amount
-      else if (t.type === 'expense') acc.totalExpenses += amount
+      const amountUsd = toUsd(Number(t.amount), t.currency)
+      if (t.type === 'income') acc.totalIncomeUsd += amountUsd
+      else if (t.type === 'expense') acc.totalExpensesUsd += amountUsd
       return acc
     },
-    { count: 0, totalIncome: 0, totalExpenses: 0 }
+    { count: 0, totalIncomeUsd: 0, totalExpensesUsd: 0 }
   )
 
   // Map DB rows to component-friendly format
-  const mappedTransactions = (transactions || []).map((t) => ({
-    id: t.id,
-    date: t.date,
-    description: t.description,
-    categoryId: t.category_id || '',
-    accountId: t.from_account_id || t.to_account_id || '',
-    fromAccountId: t.from_account_id,
-    toAccountId: t.to_account_id,
-    amount: t.type === 'expense' ? -Number(t.amount) : Number(t.amount),
-    type: t.type,
-    source: t.source,
-    category: t.category,
-    fromAccount: t.from_account,
-    toAccount: t.to_account,
-  }))
+  const mappedTransactions = (transactions || []).map((t) => {
+    const signedAmount = t.type === 'expense' ? -Number(t.amount) : Number(t.amount)
+    const currency = t.currency || 'USD'
+    return {
+      id: t.id,
+      date: t.date,
+      description: t.description,
+      categoryId: t.category_id || '',
+      accountId: t.from_account_id || t.to_account_id || '',
+      fromAccountId: t.from_account_id,
+      toAccountId: t.to_account_id,
+      amount: signedAmount,
+      currency,
+      // USD-converted — the only amount the UI should aggregate.
+      amountUsd: toUsd(signedAmount, currency),
+      // Destination leg of a cross-currency transfer (null otherwise).
+      toAmount: t.to_amount != null ? Number(t.to_amount) : undefined,
+      toCurrency: t.to_currency || undefined,
+      type: t.type,
+      source: t.source,
+      category: t.category,
+      fromAccount: t.from_account,
+      toAccount: t.to_account,
+    }
+  })
 
   return NextResponse.json({
     transactions: mappedTransactions,
@@ -154,7 +167,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { type, date, description, amount, categoryId, accountId, fromAccountId, toAccountId, goalAllocations } = body
+  const { type, date, description, amount, categoryId, accountId, fromAccountId, toAccountId, toAmount, toCurrency, goalAllocations } = body
 
   // Validate required fields
   if (!type || !description || !amount || amount <= 0) {
@@ -168,6 +181,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'categoryId is required for income/expense' }, { status: 400 })
   }
 
+  // Fetch the native currency + balance of every account involved, so we can
+  // stamp the transaction's currency and convert the destination leg of a
+  // cross-currency transfer. One round-trip, reused for the balance updates.
+  const involvedIds = [accountId, fromAccountId, toAccountId].filter(Boolean) as string[]
+  const acctMap = new Map<string, { balance: number; currency: string }>()
+  if (involvedIds.length > 0) {
+    const { data: involved } = await supabase
+      .from('accounts')
+      .select('id, balance, currency')
+      .in('id', involvedIds)
+    for (const a of involved || []) {
+      acctMap.set(a.id, { balance: Number(a.balance), currency: a.currency || 'USD' })
+    }
+  }
+
+  // Source-leg currency: the account money left (expense/transfer) or entered (income).
+  const sourceAccountId = type === 'transfer' ? fromAccountId : accountId
+  const sourceCurrency = acctMap.get(sourceAccountId)?.currency ?? 'USD'
+
   // Insert transaction
   const transactionData: Record<string, unknown> = {
     user_id: user.id,
@@ -175,9 +207,14 @@ export async function POST(request: NextRequest) {
     date: date || new Date().toISOString().split('T')[0],
     description,
     amount,
+    currency: sourceCurrency,
     source: 'manual',
     source_app: 'financial-ledger',
   }
+
+  // Amount credited to the destination of a transfer. Mirrors `amount` for
+  // same-currency transfers; converted/explicit for cross-currency ones.
+  let creditAmount = amount
 
   if (type === 'expense') {
     transactionData.from_account_id = accountId
@@ -188,6 +225,14 @@ export async function POST(request: NextRequest) {
   } else if (type === 'transfer') {
     transactionData.from_account_id = fromAccountId
     transactionData.to_account_id = toAccountId
+    const destCurrency = toCurrency || acctMap.get(toAccountId)?.currency || sourceCurrency
+    if (destCurrency !== sourceCurrency) {
+      // Cross-currency: prefer the actual settled amount the caller provides;
+      // otherwise convert source → USD → destination via the central rate.
+      creditAmount = toAmount != null ? Number(toAmount) : fromUsd(toUsd(amount, sourceCurrency), destCurrency)
+      transactionData.to_currency = destCurrency
+      transactionData.to_amount = creditAmount
+    }
   }
 
   const { data: transaction, error } = await supabase
@@ -228,32 +273,22 @@ export async function POST(request: NextRequest) {
         .eq('id', accountId)
     }
   } else if (type === 'transfer') {
-    // Subtract from source, add to destination
-    if (fromAccountId) {
-      const { data: fromAccount } = await supabase
+    // Debit the source in its currency (`amount`); credit the destination in
+    // *its* currency (`creditAmount`) — equal for same-currency transfers,
+    // FX-converted otherwise.
+    const fromAccount = fromAccountId ? acctMap.get(fromAccountId) : undefined
+    if (fromAccount) {
+      await supabase
         .from('accounts')
-        .select('balance')
+        .update({ balance: fromAccount.balance - amount })
         .eq('id', fromAccountId)
-        .single()
-      if (fromAccount) {
-        await supabase
-          .from('accounts')
-          .update({ balance: Number(fromAccount.balance) - amount })
-          .eq('id', fromAccountId)
-      }
     }
-    if (toAccountId) {
-      const { data: toAccount } = await supabase
+    const toAccount = toAccountId ? acctMap.get(toAccountId) : undefined
+    if (toAccount) {
+      await supabase
         .from('accounts')
-        .select('balance')
+        .update({ balance: toAccount.balance + creditAmount })
         .eq('id', toAccountId)
-        .single()
-      if (toAccount) {
-        await supabase
-          .from('accounts')
-          .update({ balance: Number(toAccount.balance) + amount })
-          .eq('id', toAccountId)
-      }
     }
   }
 

@@ -87,8 +87,8 @@ export function TransactionList({
 
   const summaryCards: { label: string; value: string; color: string }[] = [
     { label: 'Transactions', value: summary.count.toLocaleString(), color: 'var(--fg)' },
-    { label: 'Income', value: `+${formatCurrency(summary.totalIncome)}`, color: 'var(--good)' },
-    { label: 'Expenses', value: `-${formatCurrency(summary.totalExpenses)}`, color: 'var(--bad)' },
+    { label: 'Income', value: `+${formatCurrency(summary.totalIncomeUsd)}`, color: 'var(--good)' },
+    { label: 'Expenses', value: `-${formatCurrency(summary.totalExpensesUsd)}`, color: 'var(--bad)' },
   ]
 
   return (

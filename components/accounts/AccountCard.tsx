@@ -109,11 +109,17 @@ export function AccountCard({ account, onClick }: AccountCardProps) {
         </div>
       </div>
 
-      {/* Balance */}
+      {/* Balance — native currency is primary (matches bank statements);
+          USD equivalent shown as a subtle secondary for non-USD accounts. */}
       <div className="mb-3">
         <p style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em', color: isNegative ? 'var(--bad)' : 'var(--fg)' }}>
           {formatCurrency(account.balance, getAccountCurrency(account), { accounting: true })}
         </p>
+        {getAccountCurrency(account) !== 'USD' && (
+          <p style={{ marginTop: 2, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg3)' }}>
+            ≈ {formatCurrency(account.balanceUsd, 'USD', { accounting: true })}
+          </p>
+        )}
       </div>
 
       {/* Balance change indicator */}

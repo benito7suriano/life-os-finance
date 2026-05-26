@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 async function buildClient(schema?: 'finance') {
@@ -39,4 +40,23 @@ export async function createClient() {
 // Use inside `/app/api/finance/*` route handlers.
 export async function createFinanceClient() {
   return buildClient('finance')
+}
+
+// Service-role client scoped to the `finance` schema. Bypasses RLS — use ONLY
+// in trusted server-side flows where the caller is authenticated by another
+// mechanism (e.g. webhook secret header) and the user_id is verified by
+// foreign-key lookup before any write. Never expose to the browser.
+export function createFinanceServiceClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set')
+  }
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceKey,
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      db: { schema: 'finance' },
+    }
+  )
 }

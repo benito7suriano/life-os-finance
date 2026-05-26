@@ -27,7 +27,7 @@ export async function GET(_request: NextRequest) {
       .is('deleted_at', null),
     supabase
       .from('transactions')
-      .select('type, amount, category_id, from_account_id, to_account_id, to_amount, to_currency')
+      .select('type, amount, currency, category_id, from_account_id, to_account_id, to_amount, to_currency')
       .eq('user_id', user.id)
       .gte('date', monthStart)
       .lte('date', monthEnd),
@@ -51,10 +51,6 @@ export async function GET(_request: NextRequest) {
   const budgets = budgetsRes.data ?? []
   const snapshots = snapshotsRes.data ?? []
 
-  // currency lookup per account_id, used for converting transaction amounts.
-  const currencyByAccount = new Map<string, string>()
-  for (const a of accounts) currencyByAccount.set(a.id, a.currency || 'USD')
-
   // Assets: cash + savings + investments. Liabilities: credit cards + loans.
   // All summed in USD via toUsd().
   const assets = accounts
@@ -67,26 +63,21 @@ export async function GET(_request: NextRequest) {
 
   const netWorth = assets - liabilities
 
-  /** Currency for a transaction's "source" side: the account where money came from / went to. */
-  function txCurrency(t: { type: string; from_account_id: string | null; to_account_id: string | null }): string {
-    const accountId = t.type === 'income' ? t.to_account_id : t.from_account_id
-    if (accountId && currencyByAccount.has(accountId)) return currencyByAccount.get(accountId)!
-    return 'USD'
-  }
-
+  // Each transaction stores its own `currency` (denormalized at write time), so
+  // conversion no longer has to infer it from the linked account.
   const monthlyIncome = transactions
     .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + toUsd(Number(t.amount), txCurrency(t)), 0)
+    .reduce((sum, t) => sum + toUsd(Number(t.amount), t.currency), 0)
 
   const monthlyExpenses = transactions
     .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + toUsd(Number(t.amount), txCurrency(t)), 0)
+    .reduce((sum, t) => sum + toUsd(Number(t.amount), t.currency), 0)
 
   const spentByCategory = transactions
     .filter((t) => t.type === 'expense' && t.category_id)
     .reduce<Record<string, number>>((acc, t) => {
       const key = t.category_id as string
-      acc[key] = (acc[key] ?? 0) + toUsd(Number(t.amount), txCurrency(t))
+      acc[key] = (acc[key] ?? 0) + toUsd(Number(t.amount), t.currency)
       return acc
     }, {})
 
