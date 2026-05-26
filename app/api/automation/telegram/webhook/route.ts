@@ -387,6 +387,7 @@ async function handleCallback(
       date: txDate,
       description: extracted.merchant ?? 'Telegram entry',
       amount: extracted.amount,
+      currency: extracted.currency ?? 'USD',
       merchant_id: resolved.merchantId,
       category_id: resolved.categoryId,
       source: 'telegram',
