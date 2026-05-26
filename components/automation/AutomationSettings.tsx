@@ -1,6 +1,15 @@
 import type { AutomationProps } from './types'
 import { TelegramSetupCard } from './TelegramSetupCard'
 import { TelegramConnectedCard } from './TelegramConnectedCard'
+import { Card } from '@/components/ui'
+import { Info } from 'lucide-react'
+
+const TIPS = [
+  { title: 'Be specific', body: 'Include the amount, merchant, and (optionally) the date. “$12 coffee at Blue Bottle yesterday” works great.' },
+  { title: 'Clear receipts', body: "For photos, make sure the total and merchant name are legible and the receipt isn't cropped." },
+  { title: 'Voice on the go', body: 'Hold the mic button and just say the transaction. The bot transcribes and parses it the same as text.' },
+  { title: 'Confirm before saving', body: 'The bot always shows what it parsed and waits for your Confirm tap before writing to the ledger.' },
+]
 
 export function AutomationSettings({
   channels,
@@ -12,115 +21,64 @@ export function AutomationSettings({
   onDisconnectChannel,
   onRefresh,
 }: AutomationProps) {
-  const telegramChannel = channels.find(c => c.type === 'telegram')
-  const telegramConnected =
-    telegramChannel && telegramChannel.status !== 'disconnected'
+  const telegramChannel = channels.find((c) => c.type === 'telegram')
+  const telegramConnected = telegramChannel && telegramChannel.status !== 'disconnected'
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-            Automation
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Connect Telegram to log transactions hands-free from anywhere.
-          </p>
-        </div>
+    <div className="mx-auto max-w-3xl p-4 md:p-6 lg:px-8 lg:py-6">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }}>Automation</h1>
+        <p style={{ marginTop: 4, fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg3)' }}>
+          Connect Telegram to log transactions hands-free from anywhere.
+        </p>
+      </div>
 
-        {/* How it works */}
-        <div className="mb-8 p-4 rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
-          <div className="flex items-start gap-3">
-            <svg
-              className="w-5 h-5 text-sky-600 dark:text-sky-400 flex-shrink-0 mt-0.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <div>
-              <p className="text-sm font-medium text-sky-800 dark:text-sky-300">
-                How it works
-              </p>
-              <p className="text-sm text-sky-700 dark:text-sky-400 mt-1">
-                Once linked, text or voice-note the bot a transaction
-                (e.g. &ldquo;$12 coffee at Blue Bottle&rdquo;) or send a
-                receipt photo. Gemini extracts the merchant, amount, and
-                category; you confirm with a single tap before it&apos;s saved.
-              </p>
-            </div>
+      {/* How it works */}
+      <Card accent pad={18} style={{ marginBottom: 24 }}>
+        <div className="flex items-start gap-3">
+          <span
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
+            style={{ background: 'var(--accent-soft)', color: 'var(--accent-a)' }}
+          >
+            <Info className="h-4 w-4" />
+          </span>
+          <div>
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>How it works</p>
+            <p style={{ marginTop: 4, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: 1.55, color: 'var(--fg2)' }}>
+              Once linked, text or voice-note the bot a transaction (e.g. “$12 coffee at Blue Bottle”) or send a receipt photo.
+              Gemini extracts the merchant, amount, and category; you confirm with a single tap before it&apos;s saved.
+            </p>
           </div>
         </div>
+      </Card>
 
-        {/* Channel card */}
-        <div className="space-y-6">
-          {telegramConnected && telegramChannel ? (
-            <TelegramConnectedCard
-              channel={telegramChannel}
-              onPause={() => onPauseChannel?.(telegramChannel.id)}
-              onResume={() => onResumeChannel?.(telegramChannel.id)}
-              onDisconnect={() => onDisconnectChannel?.(telegramChannel.id)}
-            />
-          ) : (
-            <TelegramSetupCard
-              pendingLink={pendingLink}
-              onStartSetup={onStartTelegramSetup}
-              onCancelSetup={onCancelTelegramSetup}
-              onRefresh={onRefresh}
-            />
-          )}
-        </div>
+      {/* Channel card */}
+      <div className="space-y-6">
+        {telegramConnected && telegramChannel ? (
+          <TelegramConnectedCard
+            channel={telegramChannel}
+            onPause={() => onPauseChannel?.(telegramChannel.id)}
+            onResume={() => onResumeChannel?.(telegramChannel.id)}
+            onDisconnect={() => onDisconnectChannel?.(telegramChannel.id)}
+          />
+        ) : (
+          <TelegramSetupCard pendingLink={pendingLink} onStartSetup={onStartTelegramSetup} onCancelSetup={onCancelTelegramSetup} onRefresh={onRefresh} />
+        )}
+      </div>
 
-        {/* Tips */}
-        <div className="mt-12">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4">
-            Tips for best results
-          </h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-1">
-                Be specific
-              </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Include the amount, merchant, and (optionally) the date.
-                &ldquo;$12 coffee at Blue Bottle yesterday&rdquo; works great.
-              </p>
-            </div>
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-1">
-                Clear receipts
-              </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                For photos, make sure the total and merchant name are legible
-                and the receipt isn&apos;t cropped.
-              </p>
-            </div>
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-1">
-                Voice on the go
-              </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Hold the mic button and just say the transaction. The bot
-                transcribes and parses it the same as text.
-              </p>
-            </div>
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-1">
-                Confirm before saving
-              </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                The bot always shows what it parsed and waits for your
-                Confirm tap before writing to the ledger.
-              </p>
-            </div>
-          </div>
+      {/* Tips */}
+      <div className="mt-12">
+        <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--fg3)', marginBottom: 16 }}>
+          Tips for best results
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {TIPS.map((tip) => (
+            <Card key={tip.title} pad={16}>
+              <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600, color: 'var(--fg)', marginBottom: 4 }}>{tip.title}</h3>
+              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: 1.5, color: 'var(--fg3)' }}>{tip.body}</p>
+            </Card>
+          ))}
         </div>
       </div>
     </div>
