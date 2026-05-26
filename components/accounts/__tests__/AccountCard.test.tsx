@@ -43,18 +43,20 @@ describe('AccountCard', () => {
   // 2. Balance Change Indicators
   // ---------------------------------------------------------------------------
   describe('Balance Change Indicators', () => {
-    it('shows positive change with +prefix and emerald color', () => {
+    it('shows positive change with +prefix and good color', () => {
       render(<AccountCard account={checkingAccount} />)
       expect(screen.getByText('+$425.00')).toBeInTheDocument()
       const changeEl = screen.getByText('+$425.00')
-      expect(changeEl.className).toContain('emerald')
+      // Vault theme: positive change uses the --good token color
+      expect(changeEl.style.color).toBe('var(--good)')
     })
 
-    it('shows negative change with -prefix and rose color', () => {
+    it('shows negative change with -prefix and bad color', () => {
       render(<AccountCard account={checkingAccountNegativeChange} />)
       expect(screen.getByText('-$340.25')).toBeInTheDocument()
       const changeEl = screen.getByText('-$340.25')
-      expect(changeEl.className).toContain('rose')
+      // Vault theme: negative change uses the --bad token color
+      expect(changeEl.style.color).toBe('var(--bad)')
     })
 
     it('shows "No change" for zero change', () => {

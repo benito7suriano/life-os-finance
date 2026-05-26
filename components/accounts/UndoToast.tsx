@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { X, Undo2 } from 'lucide-react'
 import type { UndoToastProps } from './types'
+import { Button } from '@/components/ui'
 
 export function UndoToast({ message, onUndo, onDismiss, durationMs = 10000 }: UndoToastProps) {
   const [visible, setVisible] = useState(true)
@@ -28,24 +29,16 @@ export function UndoToast({ message, onUndo, onDismiss, durationMs = 10000 }: Un
   if (!visible) return null
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3
-                    bg-slate-900 dark:bg-slate-700 text-white
-                    px-4 py-3 rounded-lg shadow-lg">
-      <span className="text-sm">{message}</span>
-      <button
-        onClick={handleUndo}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md
-                   bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium
-                   transition-colors"
-      >
-        <Undo2 className="w-4 h-4" />
+    <div
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3"
+      style={{ background: 'var(--bg2)', border: '1px solid var(--card-border)', borderRadius: 14, boxShadow: '0 30px 80px -30px rgba(0,0,0,0.7)', color: 'var(--fg)' }}
+    >
+      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13 }}>{message}</span>
+      <Button variant="primary" size="sm" icon={Undo2} onClick={handleUndo}>
         Undo
-      </button>
-      <button
-        onClick={handleClose}
-        className="p-1 rounded hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors"
-      >
-        <X className="w-4 h-4" />
+      </Button>
+      <button onClick={handleClose} aria-label="Dismiss" className="flex h-7 w-7 items-center justify-center rounded-md" style={{ color: 'var(--fg3)' }}>
+        <X className="h-4 w-4" />
       </button>
     </div>
   )
