@@ -85,28 +85,40 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Compute summary from a separate query (unfiltered or filtered)
-  let summaryQuery = supabase
-    .from('transactions')
-    .select('type, amount, currency')
-    .eq('user_id', user.id)
+  // Compute summary from a separate query (unfiltered or filtered). Build a
+  // fresh filtered builder each iteration so we can paginate past PostgREST's
+  // max-rows (1000) cap — otherwise totals silently truncate to the first page.
+  const buildSummaryQuery = () => {
+    let q = supabase
+      .from('transactions')
+      .select('type, amount, currency')
+      .eq('user_id', user.id)
 
-  if (search) summaryQuery = summaryQuery.ilike('description', `%${search}%`)
-  if (categoryIds.length > 0) summaryQuery = summaryQuery.in('category_id', categoryIds)
-  if (accountIds.length > 0) {
-    summaryQuery = summaryQuery.or(
-      `from_account_id.in.(${accountIds.join(',')}),to_account_id.in.(${accountIds.join(',')})`
-    )
+    if (search) q = q.ilike('description', `%${search}%`)
+    if (categoryIds.length > 0) q = q.in('category_id', categoryIds)
+    if (accountIds.length > 0) {
+      q = q.or(
+        `from_account_id.in.(${accountIds.join(',')}),to_account_id.in.(${accountIds.join(',')})`
+      )
+    }
+    if (sources.length > 0) q = q.in('source', sources)
+    if (dateFrom) q = q.gte('date', dateFrom)
+    if (dateTo) q = q.lte('date', dateTo)
+    return q
   }
-  if (sources.length > 0) summaryQuery = summaryQuery.in('source', sources)
-  if (dateFrom) summaryQuery = summaryQuery.gte('date', dateFrom)
-  if (dateTo) summaryQuery = summaryQuery.lte('date', dateTo)
 
-  const { data: summaryData } = await summaryQuery
+  const SUMMARY_PAGE_SIZE = 1000
+  const summaryData: { type: string; amount: number | string; currency: string | null }[] = []
+  for (let from = 0; ; from += SUMMARY_PAGE_SIZE) {
+    const { data: page } = await buildSummaryQuery().range(from, from + SUMMARY_PAGE_SIZE - 1)
+    if (!page || page.length === 0) break
+    summaryData.push(...page)
+    if (page.length < SUMMARY_PAGE_SIZE) break
+  }
 
   // Totals must be currency-normalized: summing raw amounts across USD + DOP
   // rows is meaningless. `*Usd` fields are authoritative; the UI displays those.
-  const summary = (summaryData || []).reduce(
+  const summary = summaryData.reduce(
     (acc, t) => {
       acc.count++
       const amountUsd = toUsd(Number(t.amount), t.currency)
@@ -114,8 +126,10 @@ export async function GET(request: NextRequest) {
       else if (t.type === 'expense') acc.totalExpensesUsd += amountUsd
       return acc
     },
-    { count: 0, totalIncomeUsd: 0, totalExpensesUsd: 0 }
+    { count: 0, totalIncomeUsd: 0, totalExpensesUsd: 0, netUsd: 0 }
   )
+  // Net cash flow for the filtered view: positive = inflow, negative = outflow.
+  summary.netUsd = summary.totalIncomeUsd - summary.totalExpensesUsd
 
   // Map DB rows to component-friendly format
   const mappedTransactions = (transactions || []).map((t) => {

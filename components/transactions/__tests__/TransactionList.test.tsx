@@ -49,9 +49,9 @@ describe('TransactionList', () => {
   // 2. Summary Bar
   // ---------------------------------------------------------------------------
   describe('Summary Bar', () => {
-    it('displays the transaction count', () => {
+    it('displays net cash flow', () => {
       render(<TransactionList {...defaultProps} />)
-      expect(screen.getByText('15')).toBeInTheDocument()
+      expect(screen.getByText('+$8,555.67')).toBeInTheDocument()
     })
 
     it('displays income total', () => {

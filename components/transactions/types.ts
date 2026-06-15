@@ -85,6 +85,8 @@ export interface TransactionSummary {
   totalIncomeUsd: number
   /** Total expenses for the filtered view, converted to USD. */
   totalExpensesUsd: number
+  /** Net cash flow (income − expenses) for the filtered view, in USD. */
+  netUsd: number
 }
 
 // =============================================================================

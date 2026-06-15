@@ -12,6 +12,7 @@ import {
   listAccounts,
   listGoals,
 } from '@/lib/api/client'
+import { computeDateRange, DEFAULT_DATE_PRESET } from '@/components/transactions'
 import type {
   Transaction,
   TransactionFormData,
@@ -37,17 +38,25 @@ export default function TransactionsPage() {
   // Transaction data
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [totalCount, setTotalCount] = useState(0)
+  // Whether the account has ANY transactions, ignoring the active filters — drives
+  // the empty state ("add your first" vs "no matches"). Default true to avoid an
+  // onboarding flash for existing users; corrected by an unfiltered probe on mount.
+  const [hasAnyTransactions, setHasAnyTransactions] = useState(true)
   const [serverSummary, setServerSummary] = useState<TransactionSummary>({
     count: 0,
     totalIncomeUsd: 0,
     totalExpensesUsd: 0,
+    netUsd: 0,
   })
 
   // UI state
   const [currentPage, setCurrentPage] = useState(1)
   const [sortField, setSortField] = useState<SortField>('date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
-  const [filters, setFilters] = useState<TransactionFilters>({})
+  // Default the view to the current month; user can switch presets or clear to all-time.
+  const [filters, setFilters] = useState<TransactionFilters>(() => ({
+    dateRange: computeDateRange(DEFAULT_DATE_PRESET),
+  }))
   const [searchQuery, setSearchQuery] = useState('')
 
   // Modal state
@@ -65,11 +74,20 @@ export default function TransactionsPage() {
       setIsAuthed(true)
 
       // Run each independently so one failing call doesn't break the others.
-      const [catsRes, acctsRes, goalsRes] = await Promise.allSettled([
+      // The unfiltered probe (limit 1) tells us whether the account has any
+      // transactions at all, independent of the current date/filter selection.
+      const [catsRes, acctsRes, goalsRes, anyTxRes] = await Promise.allSettled([
         listCategories(),
         listAccounts(),
         listGoals(),
+        listTransactions({ limit: 1 }),
       ])
+
+      if (anyTxRes.status === 'fulfilled') {
+        setHasAnyTransactions((anyTxRes.value.totalCount || 0) > 0)
+      } else {
+        console.error('[transactions] hasAnyTransactions probe failed', anyTxRes.reason)
+      }
 
       if (catsRes.status === 'fulfilled') {
         setCategories((catsRes.value.categories || []) as Category[])
@@ -279,7 +297,7 @@ export default function TransactionsPage() {
         sortDirection={sortDirection}
         filters={filters}
         searchQuery={searchQuery}
-        hasAnyTransactions={totalCount > 0}
+        hasAnyTransactions={hasAnyTransactions}
         onCreate={handleCreate}
         onEdit={handleEdit}
         onDelete={handleDelete}

@@ -1,5 +1,5 @@
 export { TransactionList } from './TransactionList'
 export { TransactionRow } from './TransactionRow'
-export { TransactionFiltersBar } from './TransactionFilters'
+export { TransactionFiltersBar, computeDateRange, DEFAULT_DATE_PRESET } from './TransactionFilters'
 export { TransactionModal } from './TransactionModal'
 export { DeleteConfirmDialog } from './DeleteConfirmDialog'

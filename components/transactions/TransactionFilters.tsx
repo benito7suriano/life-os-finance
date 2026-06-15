@@ -29,7 +29,10 @@ const SOURCE_OPTIONS = [
   { label: 'Email', value: 'email' as const },
 ]
 
-function computeDateRange(preset: string): { start: string; end: string } | undefined {
+/** The date preset selected by default when the Transactions page first loads. */
+export const DEFAULT_DATE_PRESET = 'this-month'
+
+export function computeDateRange(preset: string): { start: string; end: string } | undefined {
   const now = new Date()
   const end = now.toISOString().split('T')[0]
 
@@ -86,7 +89,7 @@ function triggerStyle(active: boolean): CSSProperties {
 export function TransactionFiltersBar({ categories, accounts, filters = {}, onFilterChange, onSearch }: TransactionFiltersBarProps) {
   const [searchValue, setSearchValue] = useState(filters.search || '')
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
-  const [datePreset, setDatePreset] = useState<string | null>(null)
+  const [datePreset, setDatePreset] = useState<string | null>(DEFAULT_DATE_PRESET)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
