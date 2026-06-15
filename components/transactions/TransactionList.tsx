@@ -86,9 +86,13 @@ export function TransactionList({
   }
 
   const summaryCards: { label: string; value: string; color: string }[] = [
-    { label: 'Transactions', value: summary.count.toLocaleString(), color: 'var(--fg)' },
     { label: 'Income', value: `+${formatCurrency(summary.totalIncomeUsd)}`, color: 'var(--good)' },
     { label: 'Expenses', value: `-${formatCurrency(summary.totalExpensesUsd)}`, color: 'var(--bad)' },
+    {
+      label: 'Net',
+      value: `${summary.netUsd >= 0 ? '+' : '-'}${formatCurrency(Math.abs(summary.netUsd))}`,
+      color: summary.netUsd >= 0 ? 'var(--good)' : 'var(--bad)',
+    },
   ]
 
   return (

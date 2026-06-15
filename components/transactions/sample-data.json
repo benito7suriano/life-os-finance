@@ -212,7 +212,8 @@
   "summary": {
     "count": 15,
     "totalIncomeUsd": 9350.0,
-    "totalExpensesUsd": 794.33
+    "totalExpensesUsd": 794.33,
+    "netUsd": 8555.67
   },
   "goalsByAccount": [
     {
