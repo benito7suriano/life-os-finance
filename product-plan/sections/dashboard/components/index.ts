@@ -1,6 +1,0 @@
-export { Dashboard } from './Dashboard'
-export { KpiCards } from './KpiCards'
-export { SpendingChart } from './SpendingChart'
-export { TrendChart } from './TrendChart'
-export { QuickActions } from './QuickActions'
-export { RecentTransactions } from './RecentTransactions'

@@ -1,0 +1,172 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 3104 >>
+stream
+BT
+/F1 18.0 Tf
+1 0 0 1 54.00 738.00 Tm
+(Ledger App Summary) Tj
+ET
+BT
+/F1 12.0 Tf
+1 0 0 1 54.00 718.00 Tm
+(What it is) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 703.00 Tm
+(Ledger is a Next.js 16 web app for personal finance management using Supabase.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 689.00 Tm
+(It combines dashboard, transactions, accounts, budgets, and automation settings.) Tj
+ET
+BT
+/F1 12.0 Tf
+1 0 0 1 54.00 671.00 Tm
+(Who it's for) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 656.00 Tm
+(Primary persona: people tracking personal finances; product docs/metadata mention El Salvador users.) Tj
+ET
+BT
+/F1 12.0 Tf
+1 0 0 1 54.00 638.00 Tm
+(What it does) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 623.00 Tm
+(- Email/password sign in-up via Supabase Auth; middleware protects app routes.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 609.00 Tm
+(- Dashboard with KPI cards, charts, recent transactions, and quick actions.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 595.00 Tm
+(- Transactions: list, search, filter, sort, paginate, and create expense-income-transfer.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 581.00 Tm
+(- Accounts: create, edit, soft-delete, restore, and archived-view toggling.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 567.00 Tm
+(- Budgets and sinking funds with linked goals, contributions, and monthly history.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 553.00 Tm
+(- Automation channels for WhatsApp and email with connect/pause/resume/disconnect.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 539.00 Tm
+(- Demo fallback mode uses local sample-data JSON when API data is unavailable.) Tj
+ET
+BT
+/F1 12.0 Tf
+1 0 0 1 54.00 521.00 Tm
+(How it works \(repo evidence\)) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 506.00 Tm
+(- UI: Next.js App Router pages in app/\(app\) and reusable components/* sections.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 492.00 Tm
+(- Session/Auth: @supabase/ssr browser/server clients plus proxy middleware redirects.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 478.00 Tm
+(- API: /api/* route handlers validate user then run Supabase queries and mutations.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 464.00 Tm
+(- Data: PostgreSQL schema + RLS policies in supabase/migrations/*.sql.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 450.00 Tm
+(- Data flow: page fetches API -> API hits Supabase -> JSON response -> React state.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 436.00 Tm
+(- External bank parsing pipeline: Not found in repo.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 422.00 Tm
+(- Production WhatsApp verification provider integration: Not found in repo \(stub endpoints\).) Tj
+ET
+BT
+/F1 12.0 Tf
+1 0 0 1 54.00 404.00 Tm
+(How to run \(minimal\)) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 389.00 Tm
+(1. Install dependencies: npm install) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 375.00 Tm
+(2. Add .env values: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 361.00 Tm
+(   Example values and setup details: Not found in repo.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 347.00 Tm
+(3. Optional DB migration/seed command: Not found in repo.) Tj
+ET
+BT
+/F1 10.5 Tf
+1 0 0 1 54.00 333.00 Tm
+(4. Start app: npm run dev, then open http://localhost:3000) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000317 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3472
+%%EOF
