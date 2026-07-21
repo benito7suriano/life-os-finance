@@ -6,7 +6,6 @@ import { Dashboard } from '@/components/dashboard'
 import { createClient } from '@/lib/supabase/client'
 import { listAccounts, listTransactions } from '@/lib/api/client'
 import type { DashboardProps, Account as DashAccount, Transaction as DashTxn, Summary } from '@/components/dashboard/types'
-import { toUsd } from '@/lib/fx'
 
 const EMPTY_SUMMARY: Summary = {
   netWorth: { amount: 0, previousAmount: 0, change: 0, changePercent: 0, trend: 'stable' },
@@ -105,6 +104,7 @@ export default function DashboardPage() {
           name: string
           type: string
           balance: number | string
+          balanceUsd?: number | string
           currency?: string
           institutionId?: string
           icon?: string
@@ -121,18 +121,24 @@ export default function DashboardPage() {
           toAccount?: { id: string; name: string }
         }
 
-        // Map accounts → DashAccount[]. Balances normalized to USD for the
-        // summary cards; per-account display can show native currency elsewhere.
-        const dashAccounts: DashAccount[] = ((accountsRes.accounts as ApiAccount[]) || []).map((a) => ({
-          id: a.id,
-          name: a.name,
-          type: a.type as DashAccount['type'],
-          institution: a.institutionId,
-          balance: Number(a.balance),
-          creditLimit: a.creditLimit != null ? Number(a.creditLimit) : undefined,
-          currency: a.currency || 'USD',
-          icon: a.icon || 'wallet',
-        }))
+        // Map accounts → DashAccount[]. `balance` stays native (for display);
+        // `balanceUsd` (precomputed by the API) is what the dashboard aggregates
+        // so mixed-currency accounts sum correctly.
+        const dashAccounts: DashAccount[] = ((accountsRes.accounts as ApiAccount[]) || []).map((a) => {
+          const balance = Number(a.balance)
+          return {
+            id: a.id,
+            name: a.name,
+            type: a.type as DashAccount['type'],
+            institution: a.institutionId,
+            balance,
+            // Fall back to native balance only if the API omitted the USD field.
+            balanceUsd: a.balanceUsd != null ? Number(a.balanceUsd) : balance,
+            creditLimit: a.creditLimit != null ? Number(a.creditLimit) : undefined,
+            currency: a.currency || 'USD',
+            icon: a.icon || 'wallet',
+          }
+        })
         setAccounts(dashAccounts)
 
         // Map recent transactions
@@ -160,12 +166,6 @@ export default function DashboardPage() {
     }
     load()
   }, [])
-
-  // Convert account balances to USD for the dashboard's totals.
-  // (Net worth in summary is already USD-normalized in /api/finance/summary.)
-  // Account cards on /accounts show native currency; on dashboard we pass
-  // them through as-is — currency badges in cards will still distinguish.
-  void toUsd
 
   return (
     <Dashboard

@@ -11,8 +11,9 @@ interface NetWorthHeroProps {
 
 export function NetWorthHero({ summary, accounts, trend }: NetWorthHeroProps) {
   const { netWorth, monthlyIncome, monthlyExpenses } = summary
-  const assets = accounts.filter((a) => a.balance > 0).reduce((s, a) => s + a.balance, 0)
-  const debts = accounts.filter((a) => a.balance < 0).reduce((s, a) => s + a.balance, 0)
+  // Aggregate in USD — accounts may be in different currencies.
+  const assets = accounts.filter((a) => a.balanceUsd > 0).reduce((s, a) => s + a.balanceUsd, 0)
+  const debts = accounts.filter((a) => a.balanceUsd < 0).reduce((s, a) => s + a.balanceUsd, 0)
   const saved = monthlyIncome.amount - monthlyExpenses.amount
 
   // net cumulative series for the sparkline
@@ -21,8 +22,8 @@ export function NetWorthHero({ summary, accounts, trend }: NetWorthHeroProps) {
   const up = netWorth.trend !== 'down'
 
   const breakdown = [
-    { k: 'Assets', v: formatCurrency(assets), sub: `${accounts.filter((a) => a.balance > 0).length} accounts`, color: 'var(--fg)' },
-    { k: 'Debts', v: debts === 0 ? '$0.00' : formatCurrency(debts), sub: `${accounts.filter((a) => a.balance < 0).length} accounts`, color: 'var(--bad)' },
+    { k: 'Assets', v: formatCurrency(assets), sub: `${accounts.filter((a) => a.balanceUsd > 0).length} accounts`, color: 'var(--fg)' },
+    { k: 'Debts', v: debts === 0 ? '$0.00' : formatCurrency(debts), sub: `${accounts.filter((a) => a.balanceUsd < 0).length} accounts`, color: 'var(--bad)' },
     { k: 'Saved · mo', v: formatCurrency(saved, { sign: true }), sub: 'income − expenses', color: saved >= 0 ? 'var(--good)' : 'var(--bad)' },
   ]
 

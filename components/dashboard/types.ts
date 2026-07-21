@@ -48,7 +48,10 @@ export interface Account {
   name: string
   type: 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet' | 'investment'
   institution?: string
+  /** Native balance, for display alongside `currency`. */
   balance: number
+  /** Balance converted to USD — the ONLY field the UI may aggregate. */
+  balanceUsd: number
   creditLimit?: number
   currency: string
   icon: string
