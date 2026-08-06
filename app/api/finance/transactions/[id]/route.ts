@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createFinanceClient } from '@/lib/supabase/server'
+import { toUsd, fromUsd } from '@/lib/fx'
+import { applyTransactionBalances, legsFromRow } from '@/lib/finance/apply-balances'
 
 export async function PUT(
   request: NextRequest,
@@ -30,7 +32,7 @@ export async function PUT(
   }
 
   const body = await request.json()
-  const { type, date, description, amount, categoryId, accountId, fromAccountId, toAccountId, goalAllocations } = body
+  const { type, date, description, amount, categoryId, accountId, fromAccountId, toAccountId, toAmount, toCurrency, goalAllocations } = body
 
   // Validate
   if (!type || !description || !amount || amount <= 0) {
@@ -40,59 +42,15 @@ export async function PUT(
     )
   }
 
-  // Reverse old balance changes
-  const oldAmount = Number(existing.amount)
-  if (existing.type === 'expense' && existing.from_account_id) {
-    const { data: acc } = await supabase
-      .from('accounts')
-      .select('balance')
-      .eq('id', existing.from_account_id)
-      .single()
-    if (acc) {
-      await supabase
-        .from('accounts')
-        .update({ balance: Number(acc.balance) + oldAmount })
-        .eq('id', existing.from_account_id)
-    }
-  } else if (existing.type === 'income' && existing.to_account_id) {
-    const { data: acc } = await supabase
-      .from('accounts')
-      .select('balance')
-      .eq('id', existing.to_account_id)
-      .single()
-    if (acc) {
-      await supabase
-        .from('accounts')
-        .update({ balance: Number(acc.balance) - oldAmount })
-        .eq('id', existing.to_account_id)
-    }
-  } else if (existing.type === 'transfer') {
-    if (existing.from_account_id) {
-      const { data: acc } = await supabase
-        .from('accounts')
-        .select('balance')
-        .eq('id', existing.from_account_id)
-        .single()
-      if (acc) {
-        await supabase
-          .from('accounts')
-          .update({ balance: Number(acc.balance) + oldAmount })
-          .eq('id', existing.from_account_id)
-      }
-    }
-    if (existing.to_account_id) {
-      const { data: acc } = await supabase
-        .from('accounts')
-        .select('balance')
-        .eq('id', existing.to_account_id)
-        .single()
-      if (acc) {
-        await supabase
-          .from('accounts')
-          .update({ balance: Number(acc.balance) - oldAmount })
-          .eq('id', existing.to_account_id)
-      }
-    }
+  // Reverse the old balance effects. legsFromRow uses the stored to_amount for
+  // the destination leg, so cross-currency transfers reverse exactly.
+  try {
+    await applyTransactionBalances(supabase, legsFromRow(existing), -1)
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Balance update failed' },
+      { status: 500 }
+    )
   }
 
   // Delete old goal contributions and reverse goal balances
@@ -120,13 +78,35 @@ export async function PUT(
     await supabase.from('goal_contributions').delete().eq('transaction_id', id)
   }
 
-  // Update transaction record
+  // Update the transaction record, re-stamping currency fields from the
+  // (possibly changed) accounts — mirrors the create path.
+  const involvedIds = [accountId, fromAccountId, toAccountId].filter(Boolean) as string[]
+  const acctCurrency = new Map<string, string>()
+  if (involvedIds.length > 0) {
+    const { data: involved } = await supabase
+      .from('accounts')
+      .select('id, currency')
+      .in('id', involvedIds)
+    for (const a of involved || []) {
+      acctCurrency.set(a.id, a.currency || 'USD')
+    }
+  }
+  const sourceAccountId = type === 'transfer' ? fromAccountId : accountId
+  const sourceCurrency = acctCurrency.get(sourceAccountId) ?? 'USD'
+
   const updateData: Record<string, unknown> = {
     type,
     date: date || existing.date,
     description,
     amount,
+    currency: sourceCurrency,
+    to_amount: null,
+    to_currency: null,
   }
+
+  // Amount credited to the destination of a transfer (converted/explicit for
+  // cross-currency ones).
+  let creditAmount = amount
 
   if (type === 'expense') {
     updateData.from_account_id = accountId
@@ -140,6 +120,12 @@ export async function PUT(
     updateData.from_account_id = fromAccountId
     updateData.to_account_id = toAccountId
     updateData.category_id = null
+    const destCurrency = toCurrency || acctCurrency.get(toAccountId) || sourceCurrency
+    if (destCurrency !== sourceCurrency) {
+      creditAmount = toAmount != null ? Number(toAmount) : fromUsd(toUsd(amount, sourceCurrency), destCurrency)
+      updateData.to_currency = destCurrency
+      updateData.to_amount = creditAmount
+    }
   }
 
   const { data: updated, error: updateError } = await supabase
@@ -150,61 +136,33 @@ export async function PUT(
     .single()
 
   if (updateError) {
+    // Restore the balances we reversed above so the failed edit is a no-op.
+    try {
+      await applyTransactionBalances(supabase, legsFromRow(existing), 1)
+    } catch {
+      // best-effort; the update error is the one worth reporting
+    }
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
 
-  // Apply new balance changes
-  if (type === 'expense' && accountId) {
-    const { data: acc } = await supabase
-      .from('accounts')
-      .select('balance')
-      .eq('id', accountId)
-      .single()
-    if (acc) {
-      await supabase
-        .from('accounts')
-        .update({ balance: Number(acc.balance) - amount })
-        .eq('id', accountId)
-    }
-  } else if (type === 'income' && accountId) {
-    const { data: acc } = await supabase
-      .from('accounts')
-      .select('balance')
-      .eq('id', accountId)
-      .single()
-    if (acc) {
-      await supabase
-        .from('accounts')
-        .update({ balance: Number(acc.balance) + amount })
-        .eq('id', accountId)
-    }
-  } else if (type === 'transfer') {
-    if (fromAccountId) {
-      const { data: acc } = await supabase
-        .from('accounts')
-        .select('balance')
-        .eq('id', fromAccountId)
-        .single()
-      if (acc) {
-        await supabase
-          .from('accounts')
-          .update({ balance: Number(acc.balance) - amount })
-          .eq('id', fromAccountId)
-      }
-    }
-    if (toAccountId) {
-      const { data: acc } = await supabase
-        .from('accounts')
-        .select('balance')
-        .eq('id', toAccountId)
-        .single()
-      if (acc) {
-        await supabase
-          .from('accounts')
-          .update({ balance: Number(acc.balance) + amount })
-          .eq('id', toAccountId)
-      }
-    }
+  // Apply the new balance effects.
+  try {
+    await applyTransactionBalances(
+      supabase,
+      {
+        type,
+        amount,
+        toAmount: type === 'transfer' ? creditAmount : undefined,
+        fromAccountId: type === 'expense' ? accountId : type === 'transfer' ? fromAccountId : undefined,
+        toAccountId: type === 'income' ? accountId : type === 'transfer' ? toAccountId : undefined,
+      },
+      1
+    )
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Balance update failed' },
+      { status: 500 }
+    )
   }
 
   // Create new goal contributions
@@ -266,60 +224,14 @@ export async function DELETE(
     return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
   }
 
-  const oldAmount = Number(existing.amount)
-
-  // Reverse balance changes
-  if (existing.type === 'expense' && existing.from_account_id) {
-    const { data: acc } = await supabase
-      .from('accounts')
-      .select('balance')
-      .eq('id', existing.from_account_id)
-      .single()
-    if (acc) {
-      await supabase
-        .from('accounts')
-        .update({ balance: Number(acc.balance) + oldAmount })
-        .eq('id', existing.from_account_id)
-    }
-  } else if (existing.type === 'income' && existing.to_account_id) {
-    const { data: acc } = await supabase
-      .from('accounts')
-      .select('balance')
-      .eq('id', existing.to_account_id)
-      .single()
-    if (acc) {
-      await supabase
-        .from('accounts')
-        .update({ balance: Number(acc.balance) - oldAmount })
-        .eq('id', existing.to_account_id)
-    }
-  } else if (existing.type === 'transfer') {
-    if (existing.from_account_id) {
-      const { data: acc } = await supabase
-        .from('accounts')
-        .select('balance')
-        .eq('id', existing.from_account_id)
-        .single()
-      if (acc) {
-        await supabase
-          .from('accounts')
-          .update({ balance: Number(acc.balance) + oldAmount })
-          .eq('id', existing.from_account_id)
-      }
-    }
-    if (existing.to_account_id) {
-      const { data: acc } = await supabase
-        .from('accounts')
-        .select('balance')
-        .eq('id', existing.to_account_id)
-        .single()
-      if (acc) {
-        await supabase
-          .from('accounts')
-          .update({ balance: Number(acc.balance) - oldAmount })
-          .eq('id', existing.to_account_id)
-      }
-    }
+  // Reverse balance effects (stored to_amount for the destination leg).
+  try {
+    await applyTransactionBalances(supabase, legsFromRow(existing), -1)
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Balance update failed' },
+      { status: 500 }
+    )
   }
 
   // Reverse goal contributions
@@ -354,6 +266,12 @@ export async function DELETE(
     .eq('id', id)
 
   if (deleteError) {
+    // Restore the balances we reversed so the failed delete is a no-op.
+    try {
+      await applyTransactionBalances(supabase, legsFromRow(existing), 1)
+    } catch {
+      // best-effort
+    }
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createFinanceClient } from '@/lib/supabase/server'
 import { toUsd, fromUsd } from '@/lib/fx'
+import { applyTransactionBalances } from '@/lib/finance/apply-balances'
 
 export async function GET(request: NextRequest) {
   const supabase = await createFinanceClient()
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
   const categoryIds = searchParams.get('categoryIds')?.split(',').filter(Boolean) || []
   const accountIds = searchParams.get('accountIds')?.split(',').filter(Boolean) || []
   const sources = searchParams.get('sources')?.split(',').filter(Boolean) || []
+  const types = searchParams.get('types')?.split(',').filter(Boolean) || []
   const dateFrom = searchParams.get('dateFrom')
   const dateTo = searchParams.get('dateTo')
   const sortBy = searchParams.get('sortBy') || 'date'
@@ -62,6 +64,11 @@ export async function GET(request: NextRequest) {
     query = query.in('source', sources)
   }
 
+  // Type filter (expense / income / transfer)
+  if (types.length > 0) {
+    query = query.in('type', types)
+  }
+
   // Date range filter
   if (dateFrom) {
     query = query.gte('date', dateFrom)
@@ -99,6 +106,7 @@ export async function GET(request: NextRequest) {
     )
   }
   if (sources.length > 0) summaryQuery = summaryQuery.in('source', sources)
+  if (types.length > 0) summaryQuery = summaryQuery.in('type', types)
   if (dateFrom) summaryQuery = summaryQuery.gte('date', dateFrom)
   if (dateTo) summaryQuery = summaryQuery.lte('date', dateTo)
 
@@ -181,24 +189,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'categoryId is required for income/expense' }, { status: 400 })
   }
 
-  // Fetch the native currency + balance of every account involved, so we can
-  // stamp the transaction's currency and convert the destination leg of a
-  // cross-currency transfer. One round-trip, reused for the balance updates.
+  // Fetch the native currency of every account involved, so we can stamp the
+  // transaction's currency and convert the destination leg of a cross-currency
+  // transfer. Balance updates go through the update_account_balance RPC.
   const involvedIds = [accountId, fromAccountId, toAccountId].filter(Boolean) as string[]
-  const acctMap = new Map<string, { balance: number; currency: string }>()
+  const acctCurrency = new Map<string, string>()
   if (involvedIds.length > 0) {
     const { data: involved } = await supabase
       .from('accounts')
-      .select('id, balance, currency')
+      .select('id, currency')
       .in('id', involvedIds)
     for (const a of involved || []) {
-      acctMap.set(a.id, { balance: Number(a.balance), currency: a.currency || 'USD' })
+      acctCurrency.set(a.id, a.currency || 'USD')
     }
   }
 
   // Source-leg currency: the account money left (expense/transfer) or entered (income).
   const sourceAccountId = type === 'transfer' ? fromAccountId : accountId
-  const sourceCurrency = acctMap.get(sourceAccountId)?.currency ?? 'USD'
+  const sourceCurrency = acctCurrency.get(sourceAccountId) ?? 'USD'
 
   // Insert transaction
   const transactionData: Record<string, unknown> = {
@@ -225,7 +233,7 @@ export async function POST(request: NextRequest) {
   } else if (type === 'transfer') {
     transactionData.from_account_id = fromAccountId
     transactionData.to_account_id = toAccountId
-    const destCurrency = toCurrency || acctMap.get(toAccountId)?.currency || sourceCurrency
+    const destCurrency = toCurrency || acctCurrency.get(toAccountId) || sourceCurrency
     if (destCurrency !== sourceCurrency) {
       // Cross-currency: prefer the actual settled amount the caller provides;
       // otherwise convert source → USD → destination via the central rate.
@@ -245,51 +253,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Update account balances
-  if (type === 'expense' && accountId) {
-    await supabase.rpc('update_account_balance', {
-      p_account_id: accountId,
-      p_delta: -amount,
-    }).then(({ error: rpcError }) => {
-      // Fallback to manual update if RPC doesn't exist
-      if (rpcError) {
-        return supabase
-          .from('accounts')
-          .update({ balance: supabase.rpc('get_balance_minus', { id: accountId, delta: amount }) as unknown as number })
-          .eq('id', accountId)
-      }
-    })
-  } else if (type === 'income' && accountId) {
-    // For income, add to account balance
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('balance')
-      .eq('id', accountId)
-      .single()
-    if (account) {
-      await supabase
-        .from('accounts')
-        .update({ balance: Number(account.balance) + amount })
-        .eq('id', accountId)
-    }
-  } else if (type === 'transfer') {
-    // Debit the source in its currency (`amount`); credit the destination in
-    // *its* currency (`creditAmount`) — equal for same-currency transfers,
-    // FX-converted otherwise.
-    const fromAccount = fromAccountId ? acctMap.get(fromAccountId) : undefined
-    if (fromAccount) {
-      await supabase
-        .from('accounts')
-        .update({ balance: fromAccount.balance - amount })
-        .eq('id', fromAccountId)
-    }
-    const toAccount = toAccountId ? acctMap.get(toAccountId) : undefined
-    if (toAccount) {
-      await supabase
-        .from('accounts')
-        .update({ balance: toAccount.balance + creditAmount })
-        .eq('id', toAccountId)
-    }
+  // Apply balance effects atomically via the update_account_balance RPC.
+  // Insert + balance updates are separate statements (PostgREST has no
+  // cross-statement transactions); on failure, roll back the inserted row.
+  try {
+    await applyTransactionBalances(
+      supabase,
+      {
+        type,
+        amount,
+        toAmount: type === 'transfer' ? creditAmount : undefined,
+        fromAccountId: type === 'expense' ? accountId : type === 'transfer' ? fromAccountId : undefined,
+        toAccountId: type === 'income' ? accountId : type === 'transfer' ? toAccountId : undefined,
+      },
+      1
+    )
+  } catch (e) {
+    await supabase.from('transactions').delete().eq('id', transaction.id)
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Balance update failed' },
+      { status: 500 }
+    )
   }
 
   // Create goal contributions for transfers

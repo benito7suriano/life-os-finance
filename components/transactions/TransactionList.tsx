@@ -188,12 +188,16 @@ export function TransactionList({
                     type: 'checking' as const,
                     icon: 'wallet',
                   }
+                  const fromAccount = transaction.fromAccountId ? getAccountById(transaction.fromAccountId) : undefined
+                  const toAccount = transaction.toAccountId ? getAccountById(transaction.toAccountId) : undefined
                   return (
                     <TransactionRow
                       key={transaction.id}
                       transaction={transaction}
                       category={category}
                       account={account}
+                      fromAccount={fromAccount}
+                      toAccount={toAccount}
                       onEdit={() => onEdit?.(transaction.id)}
                       onDelete={() => onDelete?.(transaction.id)}
                     />

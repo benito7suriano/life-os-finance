@@ -25,7 +25,7 @@ const sampleEditTransaction: Transaction = {
   currency: 'USD',
   amountUsd: -87.45,
   type: 'expense',
-  source: 'whatsapp',
+  source: 'telegram',
 }
 
 describe('TransactionModal', () => {

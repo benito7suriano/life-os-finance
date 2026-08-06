@@ -328,9 +328,9 @@
     },
     {
       "id": "qa-002",
-      "label": "Connect WhatsApp",
+      "label": "Connect Telegram",
       "icon": "message-square",
-      "href": "/automation/whatsapp"
+      "href": "/automation"
     },
     {
       "id": "qa-003",

@@ -57,11 +57,14 @@ export async function GET(_request: NextRequest) {
     .filter((a) => ['checking', 'savings', 'wallet', 'investment'].includes(a.type))
     .reduce((sum, a) => sum + toUsd(Number(a.balance), a.currency), 0)
 
-  const liabilities = accounts
+  // Debt balances are stored NEGATIVE, so the signed sum is negative when in
+  // debt — adding it subtracts debt from assets. (A positive value would mean
+  // a net credit balance across cards, which legitimately adds.)
+  const liabilitiesSigned = accounts
     .filter((a) => ['credit_card', 'loan'].includes(a.type))
     .reduce((sum, a) => sum + toUsd(Number(a.balance), a.currency), 0)
 
-  const netWorth = assets - liabilities
+  const netWorth = assets + liabilitiesSigned
 
   // Each transaction stores its own `currency` (denormalized at write time), so
   // conversion no longer has to infer it from the linked account.
@@ -99,7 +102,8 @@ export async function GET(_request: NextRequest) {
   return NextResponse.json({
     netWorth,
     assets,
-    liabilities,
+    // Positive magnitude for display ("you owe X").
+    liabilities: -liabilitiesSigned,
     monthlyIncome,
     monthlyExpenses,
     monthlyNet: monthlyIncome - monthlyExpenses,

@@ -31,6 +31,7 @@ export interface TransactionFilters {
   categoryIds?: string[]
   accountIds?: string[]
   sources?: string[]
+  types?: string[]
   dateFrom?: string
   dateTo?: string
   sortBy?: string

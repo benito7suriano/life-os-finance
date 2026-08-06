@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import type { Transaction, Category, Account } from './types'
-import { MoreHorizontal, Pencil, Trash2, MessageCircle, Mail, Edit3, Upload, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
+import { MoreHorizontal, Pencil, Trash2, Edit3, Upload, Send, ArrowUpRight, ArrowDownLeft, ArrowLeftRight } from 'lucide-react'
 import { categoryHex } from './categoryColor'
 import { formatCurrency } from '@/lib/fx'
 
@@ -10,6 +10,9 @@ interface TransactionRowProps {
   transaction: Transaction
   category: Category
   account: Account
+  /** For transfers: source and destination accounts (fall back to `account`). */
+  fromAccount?: Account
+  toAccount?: Account
   onEdit?: () => void
   onDelete?: () => void
 }
@@ -25,19 +28,17 @@ function formatDate(dateStr: string): string {
 
 const sourceIcons: Record<string, typeof Edit3> = {
   manual: Edit3,
-  whatsapp: MessageCircle,
-  email: Mail,
   import: Upload,
+  telegram: Send,
 }
 
 const sourceLabels: Record<string, string> = {
   manual: 'Manual',
-  whatsapp: 'WhatsApp',
-  email: 'Email',
   import: 'Imported',
+  telegram: 'Telegram',
 }
 
-export function TransactionRow({ transaction, category, account, onEdit, onDelete }: TransactionRowProps) {
+export function TransactionRow({ transaction, category, account, fromAccount, toAccount, onEdit, onDelete }: TransactionRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -51,9 +52,16 @@ export function TransactionRow({ transaction, category, account, onEdit, onDelet
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const isIncome = transaction.amount > 0
+  const isTransfer = transaction.type === 'transfer'
+  const isIncome = !isTransfer && transaction.amount > 0
   const hex = categoryHex(category.color)
   const SourceIcon = sourceIcons[transaction.source] ?? Edit3
+
+  // Transfers are money movement, not income/spending: neutral styling, both
+  // accounts shown, and the destination leg for cross-currency moves.
+  const directionIcon = isTransfer ? <ArrowLeftRight size={14} /> : isIncome ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />
+  const iconBg = isTransfer ? 'rgba(255,255,255,0.07)' : isIncome ? 'rgba(74,222,128,0.12)' : 'var(--accent-soft)'
+  const iconColor = isTransfer ? 'var(--fg2)' : isIncome ? 'var(--good)' : 'var(--accent-a)'
 
   return (
     <tr
@@ -76,14 +84,14 @@ export function TransactionRow({ transaction, category, account, onEdit, onDelet
               height: 30,
               borderRadius: 8,
               flexShrink: 0,
-              background: isIncome ? 'rgba(74,222,128,0.12)' : 'var(--accent-soft)',
-              color: isIncome ? 'var(--good)' : 'var(--accent-a)',
+              background: iconBg,
+              color: iconColor,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            {isIncome ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
+            {directionIcon}
           </span>
           <p className="truncate" style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>
             {transaction.description}
@@ -98,28 +106,58 @@ export function TransactionRow({ transaction, category, account, onEdit, onDelet
         </div>
       </td>
 
-      {/* Category (soft pill) */}
+      {/* Category (soft pill; transfers get a neutral "Transfer" pill) */}
       <td className="px-4 py-3.5">
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full"
-          style={{ padding: '4px 10px', background: `${hex}22`, color: hex, fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500 }}
-        >
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: hex }} />
-          {category.name}
-        </span>
+        {isTransfer ? (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full"
+            style={{ padding: '4px 10px', background: 'rgba(255,255,255,0.07)', color: 'var(--fg2)', fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500 }}
+          >
+            <ArrowLeftRight size={10} />
+            Transfer
+          </span>
+        ) : (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full"
+            style={{ padding: '4px 10px', background: `${hex}22`, color: hex, fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500 }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: hex }} />
+            {category.name}
+          </span>
+        )}
       </td>
 
-      {/* Account */}
+      {/* Account (transfers show source → destination) */}
       <td className="px-4 py-3.5" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg2)' }}>
-        {account.name}
+        {isTransfer ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="truncate">{(fromAccount ?? account).name}</span>
+            <span style={{ color: 'var(--fg4)' }}>→</span>
+            <span className="truncate">{toAccount?.name ?? '—'}</span>
+          </span>
+        ) : (
+          account.name
+        )}
       </td>
 
       {/* Amount */}
       <td className="whitespace-nowrap px-4 py-3.5 text-right">
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: isIncome ? 'var(--good)' : 'var(--fg)' }}>
-          {isIncome ? '+' : '-'}
-          {formatCurrency(Math.abs(transaction.amount), transaction.currency)}
-        </span>
+        {isTransfer ? (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: 'var(--fg2)' }}>
+            {formatCurrency(Math.abs(transaction.amount), transaction.currency)}
+            {transaction.toAmount != null && transaction.toCurrency && transaction.toCurrency !== transaction.currency && (
+              <span style={{ color: 'var(--fg3)' }}>
+                {' → '}
+                {formatCurrency(transaction.toAmount, transaction.toCurrency)}
+              </span>
+            )}
+          </span>
+        ) : (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: isIncome ? 'var(--good)' : 'var(--fg)' }}>
+            {isIncome ? '+' : '-'}
+            {formatCurrency(Math.abs(transaction.amount), transaction.currency)}
+          </span>
+        )}
       </td>
 
       {/* Actions */}

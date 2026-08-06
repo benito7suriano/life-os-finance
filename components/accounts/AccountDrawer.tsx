@@ -79,6 +79,12 @@ export function AccountDrawer({ account, isOpen, onClose, onSave, onDelete, onRe
       }
     })
 
+    // Debt accounts show the balance as a magnitude but store it negative;
+    // re-apply the sign so saving never flips debt into an asset.
+    if (['credit_card', 'loan'].includes(selectedType) && typeof data.balance === 'number' && data.balance > 0) {
+      data.balance = -Math.abs(data.balance)
+    }
+
     if (account?.id) data.id = account.id
 
     onSave?.(data as Partial<Account>)

@@ -143,6 +143,7 @@ export default function TransactionsPage() {
         categoryIds: filters.categoryIds,
         accountIds: filters.accountIds,
         sources: filters.sources,
+        types: filters.types,
         dateFrom: filters.dateRange?.start,
         dateTo: filters.dateRange?.end,
         sortBy: sortField,

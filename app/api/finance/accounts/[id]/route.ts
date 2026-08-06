@@ -35,7 +35,15 @@ export async function PUT(
   const updateData: Record<string, unknown> = {}
 
   if (body.name !== undefined) updateData.name = body.name
-  if (body.balance !== undefined) updateData.balance = body.balance
+  if (body.balance !== undefined) {
+    // Debt accounts store balance as a negative number; the UI shows the
+    // magnitude, so re-apply the sign here as defense in depth.
+    const accountType = body.type ?? existing.type
+    updateData.balance =
+      ['credit_card', 'loan'].includes(accountType) && Number(body.balance) > 0
+        ? -Math.abs(Number(body.balance))
+        : body.balance
+  }
   if (body.beneficiaryName !== undefined) updateData.beneficiary_name = body.beneficiaryName
   if (body.institutionId !== undefined) updateData.institution_id = body.institutionId || null
   if (body.accountNumber !== undefined) updateData.account_number = body.accountNumber || null
