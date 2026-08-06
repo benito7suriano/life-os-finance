@@ -11,6 +11,8 @@ import { AccountsMini } from './AccountsMini'
 
 export function Dashboard({
   summary,
+  insights,
+  insightsGeneratedAt,
   accounts,
   monthlyTrend,
   recentTransactions,
@@ -29,7 +31,13 @@ export function Dashboard({
       {/* row 1 — net worth hero + AI insight */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
         <NetWorthHero summary={summary} accounts={accounts} trend={monthlyTrend} />
-        <InsightCard summary={summary} onSeeTransactions={goTransactions} />
+        <InsightCard
+          summary={summary}
+          insights={insights}
+          generatedAt={insightsGeneratedAt}
+          onSeeTransactions={goTransactions}
+          onNavigate={onQuickAction}
+        />
       </div>
 
       {/* row 2 — KPI tiles */}

@@ -4,8 +4,18 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Dashboard } from '@/components/dashboard'
 import { createClient } from '@/lib/supabase/client'
-import { listAccounts, listTransactions } from '@/lib/api/client'
-import type { DashboardProps, Account as DashAccount, Transaction as DashTxn, Summary } from '@/components/dashboard/types'
+import { getInsights, getSummary, listAccounts, listTransactions } from '@/lib/api/client'
+import type {
+  DashboardProps,
+  Account as DashAccount,
+  Transaction as DashTxn,
+  MonthlyTrendItem,
+  SpendingByCategory,
+  Summary,
+} from '@/components/dashboard/types'
+import type { Insight } from '@/lib/insights/types'
+
+const EMPTY_SPENDING: SpendingByCategory = { period: 'month', total: 0, categories: [] }
 
 const EMPTY_SUMMARY: Summary = {
   netWorth: { amount: 0, previousAmount: 0, change: 0, changePercent: 0, trend: 'stable' },
@@ -35,6 +45,10 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY)
   const [accounts, setAccounts] = useState<DashAccount[]>([])
   const [recentTransactions, setRecentTransactions] = useState<DashTxn[]>([])
+  const [monthlyTrend, setMonthlyTrend] = useState<MonthlyTrendItem[]>([])
+  const [spendingByCategory, setSpendingByCategory] = useState<SpendingByCategory>(EMPTY_SPENDING)
+  const [insights, setInsights] = useState<Insight[]>([])
+  const [insightsGeneratedAt, setInsightsGeneratedAt] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     async function load() {
@@ -59,19 +73,22 @@ export default function DashboardPage() {
       })
 
       // Settle each independently so one failing call doesn't blank the page.
-      const [summarySettled, accountsSettled, recentSettled] = await Promise.allSettled([
-        fetch('/api/finance/summary').then((r) => (r.ok ? r.json() : null)),
+      const [summarySettled, accountsSettled, recentSettled, insightsSettled] = await Promise.allSettled([
+        getSummary(),
         listAccounts(),
         listTransactions({ page: 1, limit: 5, sortBy: 'date', sortDir: 'desc' }),
+        getInsights(),
       ])
 
       const summaryRes = summarySettled.status === 'fulfilled' ? summarySettled.value : null
       const accountsRes = accountsSettled.status === 'fulfilled' ? accountsSettled.value : { accounts: [] }
       const recentRes = recentSettled.status === 'fulfilled' ? recentSettled.value : { transactions: [] }
+      const insightsRes = insightsSettled.status === 'fulfilled' ? insightsSettled.value : null
 
       if (summarySettled.status === 'rejected') console.error('[dashboard] summary failed', summarySettled.reason)
       if (accountsSettled.status === 'rejected') console.error('[dashboard] accounts failed', accountsSettled.reason)
       if (recentSettled.status === 'rejected') console.error('[dashboard] recent txns failed', recentSettled.reason)
+      if (insightsSettled.status === 'rejected') console.error('[dashboard] insights failed', insightsSettled.reason)
 
       try {
         if (summaryRes) {
@@ -95,8 +112,15 @@ export default function DashboardPage() {
               change: 0,
               changePercent: 0,
             },
-            budgetProjection: EMPTY_SUMMARY.budgetProjection,
+            budgetProjection: summaryRes.budgetProjection ?? EMPTY_SUMMARY.budgetProjection,
           })
+          setMonthlyTrend(summaryRes.monthlyTrend ?? [])
+          setSpendingByCategory(summaryRes.spendingByCategory ?? EMPTY_SPENDING)
+        }
+
+        if (insightsRes) {
+          setInsights(insightsRes.insights ?? [])
+          setInsightsGeneratedAt(insightsRes.generatedAt)
         }
 
         type ApiAccount = {
@@ -116,6 +140,9 @@ export default function DashboardPage() {
           amount: number
           description: string
           date: string
+          currency?: string
+          toAmount?: number
+          toCurrency?: string
           category?: { id: string; name: string; color?: string }
           fromAccount?: { id: string; name: string }
           toAccount?: { id: string; name: string }
@@ -141,17 +168,21 @@ export default function DashboardPage() {
         })
         setAccounts(dashAccounts)
 
-        // Map recent transactions
+        // Map recent transactions — keep the native amount + currency for
+        // display (formatting happens in the component via lib/fx).
         const recent: DashTxn[] = ((recentRes.transactions as ApiTxn[]) || []).map((t) => {
           const acct = t.fromAccount || t.toAccount || { id: '', name: 'Unknown' }
           return {
             id: t.id,
             type: t.type,
             amount: Math.abs(Number(t.amount)),
+            currency: t.currency || 'USD',
+            toAmount: t.toAmount != null ? Number(t.toAmount) : undefined,
+            toCurrency: t.toCurrency,
             description: t.description || '(no description)',
             category: {
               id: t.category?.id || '',
-              name: t.category?.name || 'Uncategorized',
+              name: t.category?.name || (t.type === 'transfer' ? 'Transfer' : 'Uncategorized'),
               color: t.category?.color || '#94a3b8',
             },
             account: { id: acct.id, name: acct.name },
@@ -172,10 +203,12 @@ export default function DashboardPage() {
       user={user}
       summary={summary}
       accounts={accounts}
-      spendingByCategory={{ period: 'month', total: 0, categories: [] }}
-      monthlyTrend={[]}
+      spendingByCategory={spendingByCategory}
+      monthlyTrend={monthlyTrend}
       recentTransactions={recentTransactions}
-      categories={[]}
+      categories={spendingByCategory.categories.map((c) => ({ id: c.id, name: c.name, color: c.color, icon: '' }))}
+      insights={insights}
+      insightsGeneratedAt={insightsGeneratedAt}
       notifications={{ count: 0, items: [] }}
       quickActions={[]}
       onNewTransaction={() => router.push('/transactions')}

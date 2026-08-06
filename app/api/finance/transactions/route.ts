@@ -92,25 +92,38 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Compute summary from a separate query (unfiltered or filtered)
-  let summaryQuery = supabase
-    .from('transactions')
-    .select('type, amount, currency')
-    .eq('user_id', user.id)
-
-  if (search) summaryQuery = summaryQuery.ilike('description', `%${search}%`)
-  if (categoryIds.length > 0) summaryQuery = summaryQuery.in('category_id', categoryIds)
-  if (accountIds.length > 0) {
-    summaryQuery = summaryQuery.or(
-      `from_account_id.in.(${accountIds.join(',')}),to_account_id.in.(${accountIds.join(',')})`
-    )
+  // Compute summary from a separate query with the same filters, paginated
+  // past PostgREST's max-rows cap so totals stay exact beyond 1000 rows.
+  const buildSummaryQuery = () => {
+    let q = supabase
+      .from('transactions')
+      .select('id, type, amount, currency')
+      .eq('user_id', user.id)
+    if (search) q = q.ilike('description', `%${search}%`)
+    if (categoryIds.length > 0) q = q.in('category_id', categoryIds)
+    if (accountIds.length > 0) {
+      q = q.or(
+        `from_account_id.in.(${accountIds.join(',')}),to_account_id.in.(${accountIds.join(',')})`
+      )
+    }
+    if (sources.length > 0) q = q.in('source', sources)
+    if (types.length > 0) q = q.in('type', types)
+    if (dateFrom) q = q.gte('date', dateFrom)
+    if (dateTo) q = q.lte('date', dateTo)
+    return q
   }
-  if (sources.length > 0) summaryQuery = summaryQuery.in('source', sources)
-  if (types.length > 0) summaryQuery = summaryQuery.in('type', types)
-  if (dateFrom) summaryQuery = summaryQuery.gte('date', dateFrom)
-  if (dateTo) summaryQuery = summaryQuery.lte('date', dateTo)
 
-  const { data: summaryData } = await summaryQuery
+  const summaryData: { type: string; amount: number | string; currency: string | null }[] = []
+  const SUMMARY_PAGE = 1000
+  for (let start = 0; ; start += SUMMARY_PAGE) {
+    // Stable order (unique id) so pages never skip or repeat rows.
+    const { data: summaryPage } = await buildSummaryQuery()
+      .order('id', { ascending: true })
+      .range(start, start + SUMMARY_PAGE - 1)
+    if (!summaryPage || summaryPage.length === 0) break
+    summaryData.push(...summaryPage)
+    if (summaryPage.length < SUMMARY_PAGE) break
+  }
 
   // Totals must be currency-normalized: summing raw amounts across USD + DOP
   // rows is meaningless. `*Usd` fields are authoritative; the UI displays those.
