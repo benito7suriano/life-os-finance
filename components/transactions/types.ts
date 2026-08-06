@@ -53,7 +53,7 @@ export interface Transaction {
   /** For cross-currency transfers: currency of the destination leg. */
   toCurrency?: string
   type: 'income' | 'expense' | 'transfer'
-  source: 'manual' | 'whatsapp' | 'email'
+  source: 'manual' | 'import' | 'telegram'
   /** For transfers with goal contributions: the allocation breakdown */
   goalAllocations?: GoalAllocation[]
 }
@@ -72,7 +72,8 @@ export interface TransactionFilters {
   search?: string
   categoryIds?: string[]
   accountIds?: string[]
-  sources?: ('manual' | 'whatsapp' | 'email')[]
+  sources?: ('manual' | 'import' | 'telegram')[]
+  types?: ('expense' | 'income' | 'transfer')[]
   dateRange?: {
     start: string
     end: string

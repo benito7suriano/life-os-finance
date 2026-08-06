@@ -108,7 +108,7 @@ export type Account =
 // =============================================================================
 
 export type TransactionType = 'expense' | 'income' | 'transfer'
-export type TransactionSource = 'manual' | 'whatsapp' | 'email' | 'import'
+export type TransactionSource = 'manual' | 'import' | 'telegram'
 
 export interface Transaction {
   id: string

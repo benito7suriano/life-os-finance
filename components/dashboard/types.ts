@@ -48,7 +48,10 @@ export interface Account {
   name: string
   type: 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet' | 'investment'
   institution?: string
+  /** Native balance, for display alongside `currency`. */
   balance: number
+  /** Balance converted to USD — the ONLY field the UI may aggregate. */
+  balanceUsd: number
   creditLimit?: number
   currency: string
   icon: string
@@ -95,7 +98,13 @@ export interface AccountRef {
 export interface Transaction {
   id: string
   type: 'expense' | 'income' | 'transfer'
+  /** Positive magnitude in the transaction's native currency — display only. */
   amount: number
+  /** Native currency (e.g. 'USD', 'DOP'); defaults to USD when absent. */
+  currency?: string
+  /** Cross-currency transfers: amount credited to the destination, in `toCurrency`. */
+  toAmount?: number
+  toCurrency?: string
   description: string
   merchant?: Merchant
   category: CategoryRef
@@ -136,11 +145,17 @@ export interface QuickAction {
 // Component Props
 // =============================================================================
 
+import type { Insight } from '@/lib/insights/types'
+
 export interface DashboardProps {
   /** The logged-in user's profile for personalized greeting */
   user: User
   /** Pre-calculated financial summary (net worth, monthly totals, budget status) */
   summary: Summary
+  /** Ranked insights from /api/finance/insights (top one shows in the card). */
+  insights?: Insight[]
+  /** ISO timestamp of when the insights were generated. */
+  insightsGeneratedAt?: string
   /** List of user's financial accounts */
   accounts: Account[]
   /** Spending breakdown by category for pie chart */

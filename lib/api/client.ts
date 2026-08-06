@@ -31,6 +31,7 @@ export interface TransactionFilters {
   categoryIds?: string[]
   accountIds?: string[]
   sources?: string[]
+  types?: string[]
   dateFrom?: string
   dateTo?: string
   sortBy?: string
@@ -240,5 +241,35 @@ export function getSummary() {
       spent: number
       remaining: number
     }>
+    budgetProjection: {
+      totalBudget: number
+      spent: number
+      remaining: number
+      percentUsed: number
+      daysRemaining: number
+      projectedOverspend: number
+      status: 'on_track' | 'warning' | 'over_budget'
+    }
+    monthlyTrend: Array<{ period: string; label: string; income: number; expenses: number }>
+    spendingByCategory: {
+      period: 'month'
+      total: number
+      categories: Array<{
+        id: string
+        name: string
+        amount: number
+        percent: number
+        color: string
+        transactionCount: number
+      }>
+    }
   }>(`/summary`)
+}
+
+// ── Insights ────────────────────────────────────────────────────────────────
+
+export function getInsights() {
+  return request<{ insights: import('@/lib/insights/types').Insight[]; generatedAt: string }>(
+    `/insights`
+  )
 }

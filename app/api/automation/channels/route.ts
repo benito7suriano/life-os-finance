@@ -3,7 +3,7 @@ import { createFinanceClient } from '@/lib/supabase/server'
 
 interface ChannelRow {
   id: string
-  type: 'telegram' | 'whatsapp' | 'email'
+  type: 'telegram'
   status: 'connected' | 'paused' | 'disconnected'
   connected_at: string | null
   last_activity_at: string | null

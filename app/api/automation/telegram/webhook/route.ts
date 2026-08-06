@@ -18,6 +18,7 @@ import {
   resolveReferences,
   type ResolvedReferences,
 } from '@/lib/automation/resolve-references'
+import { applyTransactionBalances } from '@/lib/finance/apply-balances'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // The finance-schema client narrows the second generic. We don't need
@@ -246,8 +247,10 @@ async function handleLinkCode(
     return
   }
 
-  // Find the pending channel by link code.
-  const { data: channel } = await supabase
+  // Find the pending channel by link code. A query ERROR (missing table,
+  // schema not exposed, bad credentials) must not masquerade as "unknown
+  // code" — throw so the top-level handler replies "something went wrong".
+  const { data: channel, error: lookupErr } = await supabase
     .from('automation_channels')
     .select(
       'id, user_id, status, telegram_link_code, telegram_link_code_expires_at'
@@ -255,6 +258,10 @@ async function handleLinkCode(
     .eq('telegram_link_code', code)
     .eq('type', 'telegram')
     .maybeSingle()
+
+  if (lookupErr) {
+    throw new Error(`link-code lookup failed: ${lookupErr.message}`)
+  }
 
   const found = channel as ChannelLookup | null
 
@@ -329,13 +336,26 @@ async function handleCallback(
   const messageId = cb.message?.message_id
   if (!chatId || !messageId || !pendingId) return
 
-  // Fetch pending row.
-  const { data: pending } = await supabase
+  const nowIso = new Date().toISOString()
+
+  // Opportunistic cleanup of expired pending rows (table stays tiny).
+  await supabase
+    .from('pending_telegram_transactions')
+    .delete()
+    .lt('expires_at', nowIso)
+
+  // Fetch pending row — only if still unexpired.
+  const { data: pending, error: pendingErr } = await supabase
     .from('pending_telegram_transactions')
     .select('id, user_id, payload, telegram_chat_id')
     .eq('id', pendingId)
     .eq('telegram_chat_id', chatId)
+    .gt('expires_at', nowIso)
     .maybeSingle()
+
+  if (pendingErr) {
+    throw new Error(`pending lookup failed: ${pendingErr.message}`)
+  }
 
   if (!pending) {
     await editMessageText(
@@ -381,13 +401,22 @@ async function handleCallback(
         ? extracted.date
         : new Date().toISOString().slice(0, 10)
 
+    // Stamp the account's native currency (matches the manual create route);
+    // the extractor's guess is only a fallback.
+    const { data: acct } = await supabase
+      .from('accounts')
+      .select('currency')
+      .eq('id', resolved.accountId)
+      .maybeSingle()
+    const currency = acct?.currency ?? extracted.currency ?? 'USD'
+
     const insertData: Record<string, unknown> = {
       user_id: pending.user_id,
       type: direction,
       date: txDate,
       description: extracted.merchant ?? 'Telegram entry',
       amount: extracted.amount,
-      currency: extracted.currency ?? 'USD',
+      currency,
       merchant_id: resolved.merchantId,
       category_id: resolved.categoryId,
       source: 'telegram',
@@ -411,6 +440,24 @@ async function handleCallback(
         `⚠️ Save failed: ${txErr.message}`
       )
       return
+    }
+
+    // Keep the account balance in sync — same helper as the manual routes.
+    let balanceWarning = false
+    try {
+      await applyTransactionBalances(
+        supabase,
+        {
+          type: direction,
+          amount: extracted.amount,
+          fromAccountId: direction === 'expense' ? resolved.accountId : undefined,
+          toAccountId: direction === 'income' ? resolved.accountId : undefined,
+        },
+        1
+      )
+    } catch (balanceErr) {
+      console.error('[telegram-webhook] balance update failed', balanceErr)
+      balanceWarning = true
     }
 
     // Update channel stats.
@@ -437,7 +484,9 @@ async function handleCallback(
     await editMessageText(
       chatId,
       messageId,
-      `✅ Saved.\n\n${formatPendingSummary(extracted, resolved, { saved: true })}`
+      `✅ Saved.\n\n${formatPendingSummary(extracted, resolved, { saved: true })}${
+        balanceWarning ? '\n\n⚠️ Saved, but the account balance didn\'t update — check the app.' : ''
+      }`
     )
   }
 }
@@ -449,12 +498,16 @@ async function findConnectedChannelByChat(
   supabase: FinanceSupabase,
   chatId: number
 ): Promise<{ id: string; user_id: string; status: ChannelLookup['status'] } | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('automation_channels')
     .select('id, user_id, status')
     .eq('telegram_chat_id', chatId)
     .eq('type', 'telegram')
     .maybeSingle()
+  // A query error is not "unknown chat" — surface it to the top-level handler.
+  if (error) {
+    throw new Error(`channel lookup failed: ${error.message}`)
+  }
   return (data as { id: string; user_id: string; status: ChannelLookup['status'] } | null) ?? null
 }
 

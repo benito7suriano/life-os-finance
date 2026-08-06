@@ -25,8 +25,14 @@ const DATE_PRESETS = [
 
 const SOURCE_OPTIONS = [
   { label: 'Manual', value: 'manual' as const },
-  { label: 'WhatsApp', value: 'whatsapp' as const },
-  { label: 'Email', value: 'email' as const },
+  { label: 'Imported', value: 'import' as const },
+  { label: 'Telegram', value: 'telegram' as const },
+]
+
+const TYPE_OPTIONS = [
+  { label: 'Expense', value: 'expense' as const },
+  { label: 'Income', value: 'income' as const },
+  { label: 'Transfer', value: 'transfer' as const },
 ]
 
 function computeDateRange(preset: string): { start: string; end: string } | undefined {
@@ -116,10 +122,16 @@ export function TransactionFiltersBar({ categories, accounts, filters = {}, onFi
     onFilterChange?.({ ...filters, accountIds: updated.length > 0 ? updated : undefined })
   }
 
-  const handleSourceToggle = (source: 'manual' | 'whatsapp' | 'email') => {
+  const handleSourceToggle = (source: 'manual' | 'import' | 'telegram') => {
     const current = filters.sources || []
     const updated = current.includes(source) ? current.filter((s) => s !== source) : [...current, source]
     onFilterChange?.({ ...filters, sources: updated.length > 0 ? updated : undefined })
+  }
+
+  const handleTypeToggle = (type: 'expense' | 'income' | 'transfer') => {
+    const current = filters.types || []
+    const updated = current.includes(type) ? current.filter((t) => t !== type) : [...current, type]
+    onFilterChange?.({ ...filters, types: updated.length > 0 ? updated : undefined })
   }
 
   const handleDatePresetSelect = (preset: string) => {
@@ -142,10 +154,15 @@ export function TransactionFiltersBar({ categories, accounts, filters = {}, onFi
     (filters.categoryIds && filters.categoryIds.length > 0) ||
     (filters.accountIds && filters.accountIds.length > 0) ||
     (filters.sources && filters.sources.length > 0) ||
+    (filters.types && filters.types.length > 0) ||
     datePreset !== null
 
   const activeFilterCount =
-    (filters.categoryIds?.length || 0) + (filters.accountIds?.length || 0) + (filters.sources?.length || 0) + (datePreset ? 1 : 0)
+    (filters.categoryIds?.length || 0) +
+    (filters.accountIds?.length || 0) +
+    (filters.sources?.length || 0) +
+    (filters.types?.length || 0) +
+    (datePreset ? 1 : 0)
 
   const countBadge = (n: number) => (
     <span
@@ -231,6 +248,28 @@ export function TransactionFiltersBar({ categories, accounts, filters = {}, onFi
               {accounts.map((account) => (
                 <OptionRow key={account.id} selected={filters.accountIds?.includes(account.id)} onClick={() => handleAccountToggle(account.id)}>
                   <span style={{ color: 'var(--fg)' }}>{account.name}</span>
+                </OptionRow>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Type */}
+        <div className="relative">
+          <button
+            onClick={() => setActiveDropdown(activeDropdown === 'type' ? null : 'type')}
+            className="flex h-10 items-center gap-2 rounded-xl px-3"
+            style={{ ...triggerStyle(!!filters.types?.length), fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500 }}
+          >
+            <span>Type</span>
+            {!!filters.types?.length && countBadge(filters.types.length)}
+            <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'type' ? 'rotate-180' : ''}`} />
+          </button>
+          {activeDropdown === 'type' && (
+            <div className="absolute left-0 top-full z-20 mt-2 w-44 p-2" style={POPOVER}>
+              {TYPE_OPTIONS.map((type) => (
+                <OptionRow key={type.value} selected={filters.types?.includes(type.value)} onClick={() => handleTypeToggle(type.value)}>
+                  <span style={{ color: 'var(--fg)' }}>{type.label}</span>
                 </OptionRow>
               ))}
             </div>

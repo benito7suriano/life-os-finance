@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest",
     "test:run": "vitest run",
-    "db:types": "supabase gen types typescript --project-id ibtcggqdlljrjeaqfwfw --schema public,finance > lib/supabase/database.types.ts"
+    "db:types": "supabase gen types typescript --project-id ibtcggqdlljrjeaqfwfw --schema public,finance > lib/supabase/database.types.ts",
+    "telegram:webhook": "tsx scripts/telegram/set-webhook.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

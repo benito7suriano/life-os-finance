@@ -2,6 +2,7 @@
 
 import type { Account } from './types'
 import { Card, Empty, formatCurrency } from '@/components/ui'
+import { formatCurrency as formatNative } from '@/lib/fx'
 import { Wallet } from 'lucide-react'
 
 interface AccountsMiniProps {
@@ -19,7 +20,8 @@ const TYPE_TAG: Record<Account['type'], string> = {
 }
 
 export function AccountsMini({ accounts, onGo }: AccountsMiniProps) {
-  const total = accounts.reduce((sum, a) => sum + a.balance, 0)
+  // Combined balance is USD-normalized so mixed-currency accounts sum correctly.
+  const total = accounts.reduce((sum, a) => sum + a.balanceUsd, 0)
 
   return (
     <Card hoverable onClick={onGo}>
@@ -66,7 +68,7 @@ export function AccountsMini({ accounts, onGo }: AccountsMiniProps) {
                   <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg3)', marginTop: 3 }}>{a.institution || 'Cash'}</div>
                 </div>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: debt ? 'var(--bad)' : 'var(--fg)' }}>
-                  {debt ? '−' : ''}${Math.abs(a.balance).toFixed(0)}
+                  {formatNative(a.balance, a.currency)}
                 </span>
               </div>
             )

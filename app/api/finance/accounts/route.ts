@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
   const { data: monthTransactions } = await supabase
     .from('transactions')
-    .select('type, amount, from_account_id, to_account_id')
+    .select('type, amount, to_amount, from_account_id, to_account_id')
     .eq('user_id', user.id)
     .gte('date', firstOfMonth)
 
@@ -66,7 +66,10 @@ export async function GET(request: NextRequest) {
         changeMap[t.from_account_id] = (changeMap[t.from_account_id] || 0) - amount
       }
       if (t.to_account_id) {
-        changeMap[t.to_account_id] = (changeMap[t.to_account_id] || 0) + amount
+        // Destination leg in its own currency for cross-currency transfers, so
+        // each account's change accumulates in that account's native currency.
+        const credit = t.to_amount != null ? Number(t.to_amount) : amount
+        changeMap[t.to_account_id] = (changeMap[t.to_account_id] || 0) + credit
       }
     }
   }
@@ -226,12 +229,19 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Debt accounts store balance as a negative number; the UI shows the
+  // magnitude, so re-apply the sign here as defense in depth.
+  const signedBalance =
+    ['credit_card', 'loan'].includes(type) && Number(balance) > 0
+      ? -Math.abs(Number(balance))
+      : balance
+
   // Map camelCase body to snake_case for DB
   const insertData: Record<string, unknown> = {
     user_id: user.id,
     type,
     name,
-    balance,
+    balance: signedBalance,
   }
 
   if (body.beneficiaryName) insertData.beneficiary_name = body.beneficiaryName

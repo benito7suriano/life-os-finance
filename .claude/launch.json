@@ -3,10 +3,9 @@
   "configurations": [
     {
       "name": "ledger-dev",
-      "runtimeExecutable": "/Users/benosuriano/.nvm/versions/node/v24.14.0/bin/node",
-      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev"],
-      "port": 3000,
-      "autoPort": false
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "-p", "3100"],
+      "port": 3100
     }
   ]
 }

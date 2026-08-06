@@ -298,6 +298,44 @@ describe('TransactionList', () => {
       const accountElements = screen.getAllByText('Account')
       expect(accountElements.length).toBeGreaterThanOrEqual(2)
       expect(screen.getByText('Source')).toBeInTheDocument()
+      expect(screen.getByText('Type')).toBeInTheDocument()
+    })
+
+    it('offers Manual/Imported/Telegram source options (no WhatsApp/Email)', async () => {
+      const user = userEvent.setup()
+      render(<TransactionList {...defaultProps} />)
+      await user.click(screen.getByText('Source'))
+      expect(screen.getByText('Imported')).toBeInTheDocument()
+      expect(screen.getByText('Telegram')).toBeInTheDocument()
+      expect(screen.queryByText('WhatsApp')).not.toBeInTheDocument()
+      expect(screen.queryByText('Email')).not.toBeInTheDocument()
+    })
+
+    it('calls onFilterChange with types when a type option is toggled', async () => {
+      const user = userEvent.setup()
+      const onFilterChange = vi.fn()
+      render(<TransactionList {...defaultProps} onFilterChange={onFilterChange} />)
+      await user.click(screen.getByText('Type'))
+      await user.click(screen.getByText('Expense'))
+      expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ types: ['expense'] }))
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // 8. Transfer rendering
+  // ---------------------------------------------------------------------------
+  describe('Transfer rendering', () => {
+    it('renders a transfer with a neutral Transfer pill, both accounts, and no sign', () => {
+      render(<TransactionList {...defaultProps} />)
+      const row = screen.getByText('Visa credit card payment').closest('tr')!
+      expect(within(row).getByText('Transfer')).toBeInTheDocument()
+      expect(within(row).getByText('Main Checking')).toBeInTheDocument()
+      expect(within(row).getByText('Visa Credit Card')).toBeInTheDocument()
+      // Amount is unsigned — no +/-, and never the green income treatment
+      expect(within(row).getByText('$450.00')).toBeInTheDocument()
+      expect(within(row).queryByText('+$450.00')).not.toBeInTheDocument()
+      expect(within(row).queryByText('-$450.00')).not.toBeInTheDocument()
+      expect(within(row).queryByText('Uncategorized')).not.toBeInTheDocument()
     })
   })
 })

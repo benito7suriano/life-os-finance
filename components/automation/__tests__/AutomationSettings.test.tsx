@@ -41,6 +41,28 @@ const pendingLink: PendingTelegramLink = {
   deepLink: 'https://t.me/bjs_ledger_bot?start=482917',
 }
 
+describe('AutomationSettings — error banner', () => {
+  it('renders the error and dismisses it', async () => {
+    const user = userEvent.setup()
+    const onDismissError = vi.fn()
+    render(
+      <AutomationSettings
+        {...baseProps}
+        error="Could not start Telegram setup."
+        onDismissError={onDismissError}
+      />
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not start Telegram setup.')
+    await user.click(screen.getByLabelText('Dismiss error'))
+    expect(onDismissError).toHaveBeenCalledOnce()
+  })
+
+  it('renders no banner when there is no error', () => {
+    render(<AutomationSettings {...baseProps} />)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
 describe('AutomationSettings — Telegram', () => {
   it('shows the Connect Telegram button when no channel is connected', () => {
     render(<AutomationSettings {...baseProps} />)

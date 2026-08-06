@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createFinanceClient } from '@/lib/supabase/server'
 import { toUsd } from '@/lib/fx'
+import {
+  computeCategoryAverages,
+  fetchExpenseCategoryContext,
+  fetchTransactionsPaged,
+  monthLabel as labelForPeriod,
+  periodOf,
+} from '@/lib/finance/history'
 
 export async function GET(request: NextRequest) {
   const supabase = await createFinanceClient()
@@ -35,25 +42,13 @@ export async function GET(request: NextRequest) {
   const monthEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
   const monthLabel = new Date(targetYear, targetMonth - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })
 
-  // 1. Fetch expense categories with subcategories
-  const { data: allCategories } = await supabase
-    .from('categories')
-    .select('id, name, parent_id, type')
-    .eq('type', 'expense')
-    .order('name')
-
-  // Categories that represent bookkeeping artifacts rather than real spending.
-  // "Balance Adjustment" is a Money Pro reconciliation entry (trues an account's
-  // computed balance up to its actual balance) — exclude it from all spend rollups.
-  const EXCLUDED_CATEGORY_NAMES = new Set(['balance adjustment'])
-  const excludedCategoryIds = new Set(
-    (allCategories || [])
-      .filter(c => EXCLUDED_CATEGORY_NAMES.has((c.name || '').trim().toLowerCase()))
-      .map(c => c.id)
-  )
-
-  const parentCategories = (allCategories || []).filter(c => !c.parent_id && !excludedCategoryIds.has(c.id))
-  const childCategories = (allCategories || []).filter(c => c.parent_id && !excludedCategoryIds.has(c.id))
+  // 1. Fetch expense categories with subcategories (shared helper also flags
+  // bookkeeping categories like "Balance Adjustment" for exclusion).
+  const catCtx = await fetchExpenseCategoryContext(supabase)
+  const allCategories = catCtx.all
+  const excludedCategoryIds = catCtx.excludedCategoryIds
+  const parentCategories = catCtx.parents
+  const childCategories = catCtx.children
 
   const categories = parentCategories.map(parent => ({
     id: parent.id,
@@ -110,11 +105,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Build child-to-parent map for category rollup
-  const childToParent: Record<string, string> = {}
-  for (const c of childCategories) {
-    childToParent[c.id] = c.parent_id
-  }
+  // Child-to-parent map for category rollup
+  const childToParent = catCtx.childToParent
 
   // Determine the full-history window: from the earliest expense transaction's
   // month up to (and including) the target month.
@@ -288,31 +280,20 @@ export async function GET(request: NextRequest) {
     monthlyHistory.push({ month: histLabel, budgeted: 0, spent: 0 })
   }
 
-  // Fetch expense transactions across the full history window (with category for
-  // averages). Paginate past PostgREST's max-rows cap so multi-year histories
-  // aggregate fully instead of silently truncating to the oldest page.
-  const histTransactions: { date: string; amount: number | string; category_id: string | null; currency: string | null }[] = []
-  const PAGE_SIZE = 1000
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data: page } = await supabase
-      .from('transactions')
-      .select('date, amount, category_id, currency')
-      .eq('user_id', user.id)
-      .eq('type', 'expense')
-      .gte('date', historyStartStr)
-      .lt('date', monthEnd)
-      .order('date', { ascending: true })
-      .range(from, from + PAGE_SIZE - 1)
-    if (!page || page.length === 0) break
-    histTransactions.push(...page)
-    if (page.length < PAGE_SIZE) break
-  }
+  // Fetch expense transactions across the full history window (with category
+  // for averages), paginating past PostgREST's max-rows cap (shared helper).
+  const histTransactions = await fetchTransactionsPaged(supabase, user.id, {
+    types: ['expense'],
+    fromDate: historyStartStr,
+    toDateExclusive: monthEnd,
+  })
 
   const spentByMonth: Record<string, number> = {}
-  for (const t of histTransactions || []) {
+  for (const t of histTransactions) {
     if (t.category_id && excludedCategoryIds.has(t.category_id)) continue
-    const tDate = new Date(t.date)
-    const key = tDate.toLocaleString('en-US', { month: 'short', year: 'numeric' })
+    // Key off the raw date string — `new Date('YYYY-MM-01')` parses as UTC and
+    // shifts 1st-of-month rows into the prior month in western timezones.
+    const key = labelForPeriod(periodOf(t.date))
     spentByMonth[key] = (spentByMonth[key] || 0) + usd(t.amount, t.currency)
   }
 
@@ -321,27 +302,16 @@ export async function GET(request: NextRequest) {
     entry.spent = Math.round((spentByMonth[entry.month] || 0) * 100) / 100
   }
 
-  // 7b. Trailing-12-month average monthly spend per category (for budget suggestions)
+  // 7b. Trailing-12-month average monthly spend per category (for budget
+  // suggestions) — shared helper, child spend rolled into parents.
   const twelveStart = new Date(targetYear, targetMonth - 12, 1)
   const twelveStartStr = `${twelveStart.getFullYear()}-${String(twelveStart.getMonth() + 1).padStart(2, '0')}-01`
-  const avgTotals: Record<string, number> = {}
-  const monthsWithData = new Set<string>()
-  for (const t of histTransactions || []) {
-    if (t.date < twelveStartStr) continue
-    const cid = t.category_id
-    if (cid && excludedCategoryIds.has(cid)) continue
-    monthsWithData.add(new Date(t.date).toLocaleString('en-US', { month: 'short', year: 'numeric' }))
-    if (!cid) continue
-    const amt = usd(t.amount, t.currency)
-    avgTotals[cid] = (avgTotals[cid] || 0) + amt
-    const parent = childToParent[cid]
-    if (parent) avgTotals[parent] = (avgTotals[parent] || 0) + amt
-  }
-  const monthsCovered = Math.min(12, Math.max(1, monthsWithData.size))
-  const categoryAverages: Record<string, number> = {}
-  for (const [cid, total] of Object.entries(avgTotals)) {
-    categoryAverages[cid] = Math.round((total / monthsCovered) * 100) / 100
-  }
+  const categoryAverages = computeCategoryAverages(
+    histTransactions,
+    excludedCategoryIds,
+    childToParent,
+    twelveStartStr
+  )
 
   // 8. Lazy-init snapshots for the current month if missing
   if (isCurrentMonth && Object.keys(targetSnapshotByBudget).length === 0 && (dbBudgets || []).length > 0) {

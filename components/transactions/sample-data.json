@@ -108,9 +108,23 @@
       "accountId": "acc-003",
       "amount": -87.45,
       "type": "expense",
-      "source": "whatsapp",
+      "source": "telegram",
       "currency": "USD",
       "amountUsd": -87.45
+    },
+    {
+      "id": "txn-transfer-001",
+      "date": "2026-01-21",
+      "description": "Visa credit card payment",
+      "categoryId": "",
+      "accountId": "acc-001",
+      "fromAccountId": "acc-001",
+      "toAccountId": "acc-003",
+      "amount": 450.0,
+      "type": "transfer",
+      "source": "manual",
+      "currency": "USD",
+      "amountUsd": 450.0
     },
     {
       "id": "txn-003",
@@ -120,7 +134,7 @@
       "accountId": "acc-003",
       "amount": -12.5,
       "type": "expense",
-      "source": "email",
+      "source": "import",
       "currency": "USD",
       "amountUsd": -12.5
     },
@@ -132,7 +146,7 @@
       "accountId": "acc-003",
       "amount": -15.99,
       "type": "expense",
-      "source": "email",
+      "source": "import",
       "currency": "USD",
       "amountUsd": -15.99
     },
@@ -144,7 +158,7 @@
       "accountId": "acc-003",
       "amount": -156.8,
       "type": "expense",
-      "source": "whatsapp",
+      "source": "telegram",
       "currency": "USD",
       "amountUsd": -156.8
     },
@@ -168,7 +182,7 @@
       "accountId": "acc-001",
       "amount": -78.32,
       "type": "expense",
-      "source": "email",
+      "source": "import",
       "currency": "USD",
       "amountUsd": -78.32
     },
@@ -192,7 +206,7 @@
       "accountId": "acc-003",
       "amount": -89.99,
       "type": "expense",
-      "source": "email",
+      "source": "import",
       "currency": "USD",
       "amountUsd": -89.99
     },
@@ -204,7 +218,7 @@
       "accountId": "acc-003",
       "amount": -45.0,
       "type": "expense",
-      "source": "whatsapp",
+      "source": "telegram",
       "currency": "USD",
       "amountUsd": -45.0
     }
