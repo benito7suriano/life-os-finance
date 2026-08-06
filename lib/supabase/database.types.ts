@@ -17,6 +17,7 @@ export type Database = {
       accounts: {
         Row: {
           account_number: string | null
+          asset_class: string | null
           balance: number
           beneficiary_name: string | null
           created_at: string
@@ -47,6 +48,7 @@ export type Database = {
         }
         Insert: {
           account_number?: string | null
+          asset_class?: string | null
           balance?: number
           beneficiary_name?: string | null
           created_at?: string
@@ -77,6 +79,7 @@ export type Database = {
         }
         Update: {
           account_number?: string | null
+          asset_class?: string | null
           balance?: number
           beneficiary_name?: string | null
           created_at?: string
@@ -121,6 +124,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      automation_channels: {
+        Row: {
+          connected_at: string | null
+          created_at: string
+          id: string
+          last_activity_at: string | null
+          paused_at: string | null
+          status: string
+          telegram_chat_id: number | null
+          telegram_link_code: string | null
+          telegram_link_code_expires_at: string | null
+          telegram_username: string | null
+          transactions_logged: number
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string | null
+          created_at?: string
+          id?: string
+          last_activity_at?: string | null
+          paused_at?: string | null
+          status?: string
+          telegram_chat_id?: number | null
+          telegram_link_code?: string | null
+          telegram_link_code_expires_at?: string | null
+          telegram_username?: string | null
+          transactions_logged?: number
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connected_at?: string | null
+          created_at?: string
+          id?: string
+          last_activity_at?: string | null
+          paused_at?: string | null
+          status?: string
+          telegram_chat_id?: number | null
+          telegram_link_code?: string | null
+          telegram_link_code_expires_at?: string | null
+          telegram_username?: string | null
+          transactions_logged?: number
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       budget_monthly_snapshots: {
         Row: {
@@ -438,11 +492,53 @@ export type Database = {
           },
         ]
       }
+      pending_telegram_transactions: {
+        Row: {
+          channel_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          payload: Json
+          telegram_chat_id: number
+          telegram_message_id: number
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          payload: Json
+          telegram_chat_id: number
+          telegram_message_id: number
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          payload?: Json
+          telegram_chat_id?: number
+          telegram_message_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_telegram_transactions_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "automation_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
           category_id: string | null
           created_at: string
+          currency: string
           date: string
           description: string
           from_account_id: string | null
@@ -452,6 +548,8 @@ export type Database = {
           source: string
           source_app: string
           to_account_id: string | null
+          to_amount: number | null
+          to_currency: string | null
           type: string
           updated_at: string
           user_id: string
@@ -460,6 +558,7 @@ export type Database = {
           amount: number
           category_id?: string | null
           created_at?: string
+          currency?: string
           date?: string
           description?: string
           from_account_id?: string | null
@@ -469,6 +568,8 @@ export type Database = {
           source?: string
           source_app?: string
           to_account_id?: string | null
+          to_amount?: number | null
+          to_currency?: string | null
           type: string
           updated_at?: string
           user_id: string
@@ -477,6 +578,7 @@ export type Database = {
           amount?: number
           category_id?: string | null
           created_at?: string
+          currency?: string
           date?: string
           description?: string
           from_account_id?: string | null
@@ -486,6 +588,8 @@ export type Database = {
           source?: string
           source_app?: string
           to_account_id?: string | null
+          to_amount?: number | null
+          to_currency?: string | null
           type?: string
           updated_at?: string
           user_id?: string
@@ -560,7 +664,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_account_balance: {
+        Args: { p_account_id: string; p_delta: number }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
@@ -571,6 +678,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      kanvas_votes: {
+        Row: {
+          decision_id: string
+          id: string
+          vote: string
+          voted_at: string | null
+          voter: string
+        }
+        Insert: {
+          decision_id: string
+          id?: string
+          vote: string
+          voted_at?: string | null
+          voter: string
+        }
+        Update: {
+          decision_id?: string
+          id?: string
+          vote?: string
+          voted_at?: string | null
+          voter?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           created_at: string
