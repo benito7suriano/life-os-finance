@@ -2,7 +2,7 @@ import type { AutomationProps } from './types'
 import { TelegramSetupCard } from './TelegramSetupCard'
 import { TelegramConnectedCard } from './TelegramConnectedCard'
 import { Card } from '@/components/ui'
-import { Info } from 'lucide-react'
+import { Info, AlertTriangle, X } from 'lucide-react'
 
 const TIPS = [
   { title: 'Be specific', body: 'Include the amount, merchant, and (optionally) the date. “$12 coffee at Blue Bottle yesterday” works great.' },
@@ -14,6 +14,8 @@ const TIPS = [
 export function AutomationSettings({
   channels,
   pendingLink,
+  error,
+  onDismissError,
   onStartTelegramSetup,
   onCancelTelegramSetup,
   onPauseChannel,
@@ -33,6 +35,26 @@ export function AutomationSettings({
           Connect Telegram to log transactions hands-free from anywhere.
         </p>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <Card pad={14} style={{ marginBottom: 16, borderColor: 'rgba(251,113,133,0.35)' }}>
+          <div className="flex items-center gap-3" role="alert">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--bad)' }} />
+            <p className="flex-1" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg)' }}>
+              {error}
+            </p>
+            <button
+              onClick={onDismissError}
+              aria-label="Dismiss error"
+              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
+              style={{ color: 'var(--fg3)' }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </Card>
+      )}
 
       {/* How it works */}
       <Card accent pad={18} style={{ marginBottom: 24 }}>

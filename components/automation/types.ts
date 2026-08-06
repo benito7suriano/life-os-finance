@@ -46,6 +46,12 @@ export interface AutomationProps {
   /** Pending Telegram link request (null if not in setup flow). */
   pendingLink: PendingTelegramLink | null
 
+  /** Error from the last channel/setup API call, shown in a dismissible banner. */
+  error?: string | null
+
+  /** Called when user dismisses the error banner. */
+  onDismissError?: () => void
+
   /** Called when user requests to start Telegram connection. */
   onStartTelegramSetup?: () => void
 

@@ -8,19 +8,29 @@ import type {
   PendingTelegramLink,
 } from '@/components/automation/types'
 
+/** Pull a human-readable message out of a failed fetch Response. */
+async function responseError(res: Response, fallback: string): Promise<string> {
+  const body = await res.json().catch(() => ({}))
+  return typeof body?.error === 'string' && body.error ? body.error : fallback
+}
+
 export default function AutomationPage() {
   const [channels, setChannels] = useState<AutomationChannel[]>([])
   const [pendingLink, setPendingLink] = useState<PendingTelegramLink | null>(null)
   const [useApi, setUseApi] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchChannels = useCallback(async () => {
     try {
       const res = await fetch('/api/automation/channels')
-      if (!res.ok) return
+      if (!res.ok) {
+        setError(await responseError(res, 'Could not load channels.'))
+        return
+      }
       const data = await res.json()
       setChannels(data.channels ?? [])
     } catch {
-      // Offline / demo mode — leave channels empty.
+      setError('Could not reach the server. Check your connection and try again.')
     }
   }, [])
 
@@ -61,14 +71,9 @@ export default function AutomationPage() {
   // --- Callbacks ---
 
   const handleStartTelegramSetup = useCallback(async () => {
+    setError(null)
     if (!useApi) {
-      // Demo mode: fabricate a pending link.
-      setPendingLink({
-        code: '123456',
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-        botUsername: 'demo_bot',
-        deepLink: 'https://t.me/demo_bot?start=123456',
-      })
+      setError('Sign in to connect Telegram.')
       return
     }
 
@@ -78,11 +83,14 @@ export default function AutomationPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'setup' }),
       })
-      if (!res.ok) return
+      if (!res.ok) {
+        setError(await responseError(res, 'Could not start Telegram setup.'))
+        return
+      }
       const data = await res.json()
       setPendingLink(data.pendingLink)
     } catch {
-      // Ignore
+      setError('Could not reach the server. Check your connection and try again.')
     }
   }, [useApi])
 
@@ -90,13 +98,14 @@ export default function AutomationPage() {
     setPendingLink(null)
     if (!useApi) return
     try {
-      await fetch('/api/automation/telegram', {
+      const res = await fetch('/api/automation/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'cancel' }),
       })
+      if (!res.ok) setError(await responseError(res, 'Could not cancel setup.'))
     } catch {
-      // Ignore
+      setError('Could not reach the server. Check your connection and try again.')
     }
   }, [useApi])
 
@@ -104,80 +113,69 @@ export default function AutomationPage() {
     if (useApi) await fetchChannels()
   }, [useApi, fetchChannels])
 
-  const handlePauseChannel = useCallback(
-    async (channelId: string) => {
-      if (useApi) {
-        try {
-          await fetch(`/api/automation/channels/${channelId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'pause' }),
-          })
-          await fetchChannels()
-        } catch {
-          // Ignore
+  const channelAction = useCallback(
+    async (channelId: string, init: RequestInit, fallbackError: string) => {
+      setError(null)
+      try {
+        const res = await fetch(`/api/automation/channels/${channelId}`, init)
+        if (!res.ok) {
+          setError(await responseError(res, fallbackError))
+          return
         }
-      } else {
-        setChannels(prev =>
-          prev.map(c =>
-            c.id === channelId
-              ? { ...c, status: 'paused' as const, pausedAt: new Date().toISOString() }
-              : c
-          )
-        )
+        await fetchChannels()
+      } catch {
+        setError('Could not reach the server. Check your connection and try again.')
       }
     },
-    [useApi, fetchChannels]
+    [fetchChannels]
+  )
+
+  const handlePauseChannel = useCallback(
+    (channelId: string) => {
+      if (!useApi) return
+      return channelAction(
+        channelId,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'pause' }),
+        },
+        'Could not pause the channel.'
+      )
+    },
+    [useApi, channelAction]
   )
 
   const handleResumeChannel = useCallback(
-    async (channelId: string) => {
-      if (useApi) {
-        try {
-          await fetch(`/api/automation/channels/${channelId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'resume' }),
-          })
-          await fetchChannels()
-        } catch {
-          // Ignore
-        }
-      } else {
-        setChannels(prev =>
-          prev.map(c =>
-            c.id === channelId
-              ? { ...c, status: 'connected' as const, pausedAt: null }
-              : c
-          )
-        )
-      }
+    (channelId: string) => {
+      if (!useApi) return
+      return channelAction(
+        channelId,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'resume' }),
+        },
+        'Could not resume the channel.'
+      )
     },
-    [useApi, fetchChannels]
+    [useApi, channelAction]
   )
 
   const handleDisconnectChannel = useCallback(
-    async (channelId: string) => {
-      if (useApi) {
-        try {
-          await fetch(`/api/automation/channels/${channelId}`, {
-            method: 'DELETE',
-          })
-          await fetchChannels()
-        } catch {
-          // Ignore
-        }
-      } else {
-        setChannels(prev => prev.filter(c => c.id !== channelId))
-      }
+    (channelId: string) => {
+      if (!useApi) return
+      return channelAction(channelId, { method: 'DELETE' }, 'Could not disconnect the channel.')
     },
-    [useApi, fetchChannels]
+    [useApi, channelAction]
   )
 
   return (
     <AutomationSettings
       channels={channels}
       pendingLink={pendingLink}
+      error={error}
+      onDismissError={() => setError(null)}
       onStartTelegramSetup={handleStartTelegramSetup}
       onCancelTelegramSetup={handleCancelTelegramSetup}
       onPauseChannel={handlePauseChannel}
