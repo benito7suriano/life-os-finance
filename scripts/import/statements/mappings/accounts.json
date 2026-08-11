@@ -1,0 +1,15 @@
+{
+  "popular-4857-DOP": { "accountId": "3e7bcc0d-a734-491f-bae6-6662f03df6ce", "name": "VISA PLATINUM DOP" },
+  "popular-4857-USD": { "accountId": "316fd69a-4f24-4497-9219-9fb73f7b34c9", "name": "VISA PLATINUM USD" },
+  "popular-8471": { "accountId": "9028a0a5-7c5d-4f95-bd4c-e200c1fa9bf6", "name": "Popular 8471 (USD)" },
+  "popular-9652": { "accountId": "469da522-37a2-4190-b02d-784bf2b5117b", "name": "Popular 9652 (DOP)" },
+  "chase-9166": { "accountId": "5a40216a-ddfb-4bce-b620-6f97737bb82e", "name": "JPM Savings 9166" },
+  "bac-9114": { "accountId": "af57a9bd-99cf-4a72-82dd-75fa1cf4f529", "name": "BAC Checking XXXXX9114" },
+  "bac-amex-7785": { "accountId": "bf4c4dff-aa0b-424a-b0b4-6f60d5f182e2", "name": "BAC AMEX 7785" },
+  "bac-visa-3448": { "accountId": "33748c0b-e54c-4177-bd2c-a2be192f284f", "name": "BAC VISA 3448" },
+  "cash-dop": { "accountId": "a3e9acbe-67f2-4d5f-9ad1-6c4c119fb100", "name": "Cash DOP" },
+  "cash-usd": { "accountId": "b0680f80-c774-49bc-ae5c-e4ef13ad958a", "name": "Cash USD" },
+  "atlantida-liquidez": { "accountId": "8a118c7c-eedb-4b41-8efa-ea0ef2ffd8c2", "name": "Atlántida (Liquidez)" },
+  "atlantida-crecimiento": { "accountId": "a0615e2e-75de-4367-be1c-6e069fa03496", "name": "Atlántida (Crecimiento)" },
+  "alpha-inversiones": { "accountId": "d95b4cd4-5a22-44eb-9ca0-009609f7c68a", "name": "Alpha Inversiones" }
+}
