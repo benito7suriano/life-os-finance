@@ -1,8 +1,9 @@
 // Resolves free-text extractor hints (merchant, category, account names)
 // into concrete IDs from the user's finance.* tables.
 //
-// Strategy: case-insensitive substring match. If no match for merchant,
-// auto-create one (matches existing manual-add behavior).
+// Strategy: case-insensitive substring match. Merchants are NEVER created
+// here — creation happens at confirm time so cancelled transactions don't
+// leave orphan merchants behind.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ExtractedTransaction } from './extract-transaction'
@@ -12,20 +13,44 @@ import type { ExtractedTransaction } from './extract-transaction'
 type AnySupabase = SupabaseClient<any, any, any>
 
 export interface ResolvedReferences {
+  /** Matched merchant id — null when unmatched (created at confirm time). */
   merchantId: string | null
+  /** Trimmed merchant name for display and confirm-time creation. */
+  merchantName: string | null
   categoryId: string | null
+  categoryName: string | null
+  categorySource: 'hint' | 'merchant_default' | 'user_choice' | null
   accountId: string | null
+  accountName: string | null
+  accountSource: 'hint' | 'default' | 'user_choice' | null
   /** Resolution notes for the user-facing confirmation message. */
   notes: {
-    merchantCreated: boolean
+    merchantMatched: boolean
     categoryMatched: boolean
     accountMatched: boolean
   }
 }
 
+export interface OptionItem {
+  id: string
+  name: string
+}
+
+export interface ResolutionContext {
+  resolved: ResolvedReferences
+  /** Direction-filtered, name-ordered — used to build clarification keyboards. */
+  categories: OptionItem[]
+  /** created_at-ordered (default account first). */
+  accounts: OptionItem[]
+}
+
 interface NamedRow {
   id: string
   name: string
+}
+
+interface MerchantRow extends NamedRow {
+  default_category_id?: string | null
 }
 
 interface AccountRow extends NamedRow {
@@ -69,73 +94,97 @@ function matchAccount(rows: AccountRow[], hint: string | null): AccountRow | nul
 }
 
 /**
- * @param supabase Finance-scoped Supabase client (createFinanceClient()).
+ * @param supabase Finance-scoped Supabase client.
  * @param userId The owning user's id.
- * @param extracted The Gemini extraction result.
- * @param direction 'expense' | 'income' — narrows the category search.
+ * @param extracted The Gemini extraction result (direction narrows categories).
  */
 export async function resolveReferences(
   supabase: AnySupabase,
   userId: string,
   extracted: ExtractedTransaction
-): Promise<ResolvedReferences> {
+): Promise<ResolutionContext> {
   // Pull candidates in parallel.
   const [merchantsRes, categoriesRes, accountsRes] = await Promise.all([
-    supabase.from('merchants').select('id, name').eq('user_id', userId),
+    supabase
+      .from('merchants')
+      .select('id, name, default_category_id')
+      .eq('user_id', userId),
     supabase
       .from('categories')
       .select('id, name, type')
       .eq('user_id', userId)
-      .eq('type', extracted.direction),
+      .eq('type', extracted.direction)
+      .order('name', { ascending: true }),
     supabase
       .from('accounts')
       .select('id, name, last_4_digits')
       .eq('user_id', userId)
-      .is('deleted_at', null),
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true }),
   ])
 
-  const merchants = (merchantsRes.data ?? []) as NamedRow[]
+  const merchants = (merchantsRes.data ?? []) as MerchantRow[]
   const categories = (categoriesRes.data ?? []) as NamedRow[]
   const accounts = (accountsRes.data ?? []) as AccountRow[]
 
-  // Resolve category and account by hint.
-  const matchedCategory = bestMatch(categories, extracted.categoryHint)
-  const matchedAccount = matchAccount(accounts, extracted.accountHint)
-
-  // Resolve merchant — create if missing and we have a name.
-  let merchantId: string | null = null
-  let merchantCreated = false
-
+  // Merchant: match only — creation is deferred to confirm time.
   const matchedMerchant = bestMatch(merchants, extracted.merchant)
-  if (matchedMerchant) {
-    merchantId = matchedMerchant.id
-  } else if (extracted.merchant && extracted.merchant.trim()) {
-    const { data: created, error } = await supabase
-      .from('merchants')
-      .insert({ user_id: userId, name: extracted.merchant.trim() })
-      .select('id')
-      .single()
-    if (!error && created) {
-      merchantId = created.id
-      merchantCreated = true
+  const merchantName =
+    matchedMerchant?.name ?? (extracted.merchant?.trim() || null)
+
+  // Category: hint match → matched merchant's default → null (ask the user).
+  let categoryId: string | null = null
+  let categoryName: string | null = null
+  let categorySource: ResolvedReferences['categorySource'] = null
+
+  const matchedCategory = bestMatch(categories, extracted.categoryHint)
+  if (matchedCategory) {
+    categoryId = matchedCategory.id
+    categoryName = matchedCategory.name
+    categorySource = 'hint'
+  } else if (matchedMerchant?.default_category_id) {
+    const fallback = categories.find(
+      c => c.id === matchedMerchant.default_category_id
+    )
+    if (fallback) {
+      categoryId = fallback.id
+      categoryName = fallback.name
+      categorySource = 'merchant_default'
     }
   }
 
-  // Fallback: if no account hint matched, pick the user's first account.
-  // Single-user app — usually just one or two.
-  let accountId = matchedAccount?.id ?? null
-  if (!accountId && accounts.length > 0) {
+  // Account: hint match → single-account default → null (ask the user).
+  const matchedAccount = matchAccount(accounts, extracted.accountHint)
+  let accountId: string | null = null
+  let accountName: string | null = null
+  let accountSource: ResolvedReferences['accountSource'] = null
+  if (matchedAccount) {
+    accountId = matchedAccount.id
+    accountName = matchedAccount.name
+    accountSource = 'hint'
+  } else if (accounts.length === 1) {
     accountId = accounts[0].id
+    accountName = accounts[0].name
+    accountSource = 'default'
   }
 
   return {
-    merchantId,
-    categoryId: matchedCategory?.id ?? null,
-    accountId,
-    notes: {
-      merchantCreated,
-      categoryMatched: !!matchedCategory,
-      accountMatched: !!matchedAccount,
+    resolved: {
+      merchantId: matchedMerchant?.id ?? null,
+      merchantName,
+      categoryId,
+      categoryName,
+      categorySource,
+      accountId,
+      accountName,
+      accountSource,
+      notes: {
+        merchantMatched: !!matchedMerchant,
+        categoryMatched: !!matchedCategory,
+        accountMatched: !!matchedAccount,
+      },
     },
+    categories: categories.map(({ id, name }) => ({ id, name })),
+    accounts: accounts.map(({ id, name }) => ({ id, name })),
   }
 }
