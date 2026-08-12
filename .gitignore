@@ -51,3 +51,6 @@ scripts/import/money-pro/data/
 
 # Verified account balances live in a local-only file — never commit balances.
 scripts/import/money-pro/mappings/balances.local.json
+
+# Statement import runs (raw bank data)
+scripts/import/statements/runs/
