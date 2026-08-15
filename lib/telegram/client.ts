@@ -103,9 +103,32 @@ export async function downloadFile(fileId: string): Promise<{
     throw new Error(`Failed to download Telegram file: ${res.status}`)
   }
   const bytes = await res.arrayBuffer()
-  const mimeType = res.headers.get('content-type') ?? 'application/octet-stream'
   const filename = info.file_path.split('/').pop() ?? info.file_id
+  // Telegram's file server labels downloads application/octet-stream, which
+  // downstream consumers (Gemini) reject — infer from the extension instead.
+  const mimeType =
+    mimeFromFilename(filename) ??
+    res.headers.get('content-type') ??
+    'application/octet-stream'
   return { bytes, mimeType, filename }
+}
+
+const EXTENSION_MIME: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  pdf: 'application/pdf',
+  oga: 'audio/ogg',
+  ogg: 'audio/ogg',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+}
+
+export function mimeFromFilename(filename: string): string | null {
+  const ext = filename.split('.').pop()?.toLowerCase()
+  return (ext && EXTENSION_MIME[ext]) || null
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +201,14 @@ export interface TelegramAudio {
   mime_type?: string
 }
 
+export interface TelegramDocument {
+  file_id: string
+  file_unique_id: string
+  file_name?: string
+  mime_type?: string
+  file_size?: number
+}
+
 export interface TelegramMessage {
   message_id: number
   from?: TelegramUser
@@ -188,6 +219,7 @@ export interface TelegramMessage {
   photo?: TelegramPhotoSize[]
   voice?: TelegramVoice
   audio?: TelegramAudio
+  document?: TelegramDocument
 }
 
 export interface TelegramCallbackQuery {

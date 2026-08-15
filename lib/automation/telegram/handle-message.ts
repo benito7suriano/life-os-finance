@@ -86,6 +86,7 @@ export async function handleMessage(
         '• Text: "$12 coffee at Blue Bottle yesterday"',
         '• Voice: hold the mic button and say it',
         '• Photo: snap a receipt',
+        '• File: a PDF or image of a receipt/statement',
         '',
         "If something's unclear I'll ask, then show a Confirm/Cancel before saving.",
       ].join('\n')
@@ -98,7 +99,7 @@ export async function handleMessage(
   if (!input) {
     await sendMessage(
       chatId,
-      'I can read text, voice notes, and photos. Try one of those!'
+      'I can read text, voice notes, photos, and PDF/image files. Try one of those!'
     )
     return
   }
@@ -420,6 +421,21 @@ export async function buildExtractorInput(
       kind: 'image',
       bytes: file.bytes,
       mimeType: file.mimeType,
+      caption: msg.caption,
+    }
+  }
+
+  // Files sent uncompressed ("as file"): PDFs and images only.
+  if (msg.document) {
+    const declared = msg.document.mime_type
+    const isPdf = declared === 'application/pdf'
+    const isImage = declared?.startsWith('image/') ?? false
+    if (!isPdf && !isImage) return null
+    const file = await downloadFile(msg.document.file_id)
+    return {
+      kind: isPdf ? 'pdf' : 'image',
+      bytes: file.bytes,
+      mimeType: declared ?? file.mimeType,
       caption: msg.caption,
     }
   }

@@ -32,6 +32,7 @@ export type ExtractorInput =
   | { kind: 'text'; text: string }
   | { kind: 'audio'; bytes: ArrayBuffer; mimeType: string }
   | { kind: 'image'; bytes: ArrayBuffer; mimeType: string; caption?: string }
+  | { kind: 'pdf'; bytes: ArrayBuffer; mimeType: string; caption?: string }
 
 const SYSTEM_PROMPT = `You extract personal-finance transactions from a single message.
 Output STRICT JSON matching the response schema. Use null for missing fields.
@@ -135,9 +136,10 @@ function buildUserContent(input: ExtractorInput, today: string): GeminiContent {
       },
     })
   } else {
+    const medium = input.kind === 'pdf' ? 'receipt or statement PDF' : 'receipt photo'
     parts.push({
       text:
-        `Today is ${today}. The user sent a receipt photo` +
+        `Today is ${today}. The user sent a ${medium}` +
         (input.caption ? ` with caption: "${input.caption}".` : '.') +
         ' Extract the transaction.',
     })

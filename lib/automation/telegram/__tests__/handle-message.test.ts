@@ -24,12 +24,12 @@ vi.mock('../../extract-transaction', async importOriginal => {
   }
 })
 
-import { sendMessage, editMessageText } from '@/lib/telegram/client'
+import { sendMessage, editMessageText, downloadFile } from '@/lib/telegram/client'
 import {
   extractTransaction,
   mergeClarification,
 } from '../../extract-transaction'
-import { processIncoming } from '../handle-message'
+import { processIncoming, buildExtractorInput } from '../handle-message'
 
 const CHANNEL = { id: 'ch1', user_id: 'u1', status: 'connected' as const }
 
@@ -270,5 +270,49 @@ describe('processIncoming — active clarification routing', () => {
     // The clarification row survives for a retry.
     const deletes = opsFor(ops, 'pending_telegram_transactions', 'delete')
     expect(deletes.some(d => d.filters.eq?.some(a => a[1] === 'p-old'))).toBe(false)
+  })
+})
+
+describe('buildExtractorInput — documents', () => {
+  const baseMsg = { message_id: 1, chat: { id: 100, type: 'private' as const }, date: 0 }
+
+  it('routes a PDF document to the pdf kind with its declared mime type', async () => {
+    const input = await buildExtractorInput({
+      ...baseMsg,
+      caption: 'lunch receipt',
+      document: { file_id: 'f1', file_unique_id: 'u1', file_name: 'receipt.pdf', mime_type: 'application/pdf' },
+    })
+    expect(input).toMatchObject({
+      kind: 'pdf',
+      mimeType: 'application/pdf',
+      caption: 'lunch receipt',
+    })
+    expect(downloadFile).toHaveBeenCalledWith('f1')
+  })
+
+  it('routes an image document to the image kind', async () => {
+    const input = await buildExtractorInput({
+      ...baseMsg,
+      document: { file_id: 'f2', file_unique_id: 'u2', file_name: 'shot.png', mime_type: 'image/png' },
+    })
+    expect(input).toMatchObject({ kind: 'image', mimeType: 'image/png' })
+  })
+
+  it('rejects unsupported document types without downloading', async () => {
+    const input = await buildExtractorInput({
+      ...baseMsg,
+      document: { file_id: 'f3', file_unique_id: 'u3', file_name: 'notes.docx', mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+    })
+    expect(input).toBeNull()
+    expect(downloadFile).not.toHaveBeenCalled()
+  })
+
+  it('uses the downloaded mime guess when the document declares none', async () => {
+    const input = await buildExtractorInput({
+      ...baseMsg,
+      document: { file_id: 'f4', file_unique_id: 'u4', file_name: 'img' },
+    })
+    // No declared mime type → not identifiable as pdf/image → rejected.
+    expect(input).toBeNull()
   })
 })
