@@ -23,6 +23,11 @@ export interface ResolvedReferences {
   accountId: string | null
   accountName: string | null
   accountSource: 'hint' | 'default' | 'user_choice' | null
+  /** Transfers only: destination account. Optional so legacy stored payloads
+   * (pre-transfer) still typecheck. */
+  toAccountId?: string | null
+  toAccountName?: string | null
+  toAccountSource?: 'hint' | 'user_choice' | null
   /** Resolution notes for the user-facing confirmation message. */
   notes: {
     merchantMatched: boolean
@@ -154,6 +159,7 @@ export async function resolveReferences(
   }
 
   // Account: hint match → single-account default → null (ask the user).
+  // Transfers skip the single-account default — they need two distinct accounts.
   const matchedAccount = matchAccount(accounts, extracted.accountHint)
   let accountId: string | null = null
   let accountName: string | null = null
@@ -162,10 +168,24 @@ export async function resolveReferences(
     accountId = matchedAccount.id
     accountName = matchedAccount.name
     accountSource = 'hint'
-  } else if (accounts.length === 1) {
+  } else if (accounts.length === 1 && extracted.direction !== 'transfer') {
     accountId = accounts[0].id
     accountName = accounts[0].name
     accountSource = 'default'
+  }
+
+  // Destination account (transfers only). Never allowed to collide with the
+  // resolved source account — a bad hint match there means "ask the user".
+  let toAccountId: string | null = null
+  let toAccountName: string | null = null
+  let toAccountSource: ResolvedReferences['toAccountSource'] = null
+  if (extracted.direction === 'transfer') {
+    const matchedTo = matchAccount(accounts, extracted.toAccountHint ?? null)
+    if (matchedTo && matchedTo.id !== accountId) {
+      toAccountId = matchedTo.id
+      toAccountName = matchedTo.name
+      toAccountSource = 'hint'
+    }
   }
 
   return {
@@ -178,6 +198,9 @@ export async function resolveReferences(
       accountId,
       accountName,
       accountSource,
+      toAccountId,
+      toAccountName,
+      toAccountSource,
       notes: {
         merchantMatched: !!matchedMerchant,
         categoryMatched: !!matchedCategory,

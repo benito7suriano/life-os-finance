@@ -209,3 +209,65 @@ describe('mergeClarification', () => {
     expect(result.intent).toBe('new_transaction')
   })
 })
+
+describe('extractTransaction — transfers', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    process.env.GEMINI_API_KEY = 'test-key'
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('coerces transfer fields and keeps direction=transfer', async () => {
+    fetchMock.mockResolvedValueOnce(
+      geminiOk({
+        amount: 63806.68,
+        currency: 'DOP',
+        merchant: null,
+        categoryHint: null,
+        accountHint: 'Cuenta de Ahorros 828289652',
+        date: '2026-08-22',
+        dateAmbiguous: false,
+        notes: null,
+        direction: 'transfer',
+        confidence: 0.85,
+        toAccountHint: 'Tarjeta de crédito / 4857',
+        toAmount: 1065.22,
+        toCurrency: 'USD',
+      })
+    )
+
+    const result = await extractTransaction({
+      kind: 'image',
+      bytes: new ArrayBuffer(8),
+      mimeType: 'image/jpeg',
+    })
+
+    expect(result.direction).toBe('transfer')
+    expect(result.amount).toBe(63806.68)
+    expect(result.currency).toBe('DOP')
+    expect(result.toAccountHint).toBe('Tarjeta de crédito / 4857')
+    expect(result.toAmount).toBe(1065.22)
+    expect(result.toCurrency).toBe('USD')
+
+    // Prompt + schema teach the transfer rules.
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    expect(body.system_instruction.parts[0].text).toContain('PAGO A TARJETAS')
+    expect(body.generation_config.response_schema.properties.direction.enum).toContain('transfer')
+  })
+
+  it('nulls transfer fields on non-transfer extractions', async () => {
+    fetchMock.mockResolvedValueOnce(geminiOk(SAMPLE))
+    const result = await extractTransaction({ kind: 'text', text: 'coffee 3.75' })
+    expect(result.toAccountHint).toBeNull()
+    expect(result.toAmount).toBeNull()
+    expect(result.toCurrency).toBeNull()
+  })
+})
