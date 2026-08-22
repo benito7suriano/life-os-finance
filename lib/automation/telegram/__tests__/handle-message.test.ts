@@ -273,6 +273,112 @@ describe('processIncoming — active clarification routing', () => {
   })
 })
 
+describe('processIncoming — Other… free-text category', () => {
+  function awaitingCategoryRow(): PendingRow {
+    const row = clarifyingRow(['category'])
+    row.payload.awaitingCategoryText = true
+    row.payload.options = {
+      categories: [
+        { id: 'c1', name: 'Coffee' },
+        { id: 'c2', name: 'Groceries' },
+      ],
+    }
+    return row
+  }
+
+  it('fuzzy-matches the reply to the closest existing category', async () => {
+    const active = awaitingCategoryRow()
+    const { supabase, ops } = mockSupabase(
+      respondWith({
+        activeClarifying: active,
+        categories: [
+          { id: 'c1', name: 'Coffee', type: 'expense' },
+          { id: 'c2', name: 'Groceries', type: 'expense' },
+        ],
+      })
+    )
+
+    await processIncoming(supabase, CHANNEL, 100, { kind: 'text', text: 'grocery' })
+
+    expect(mergeClarification).not.toHaveBeenCalled()
+    expect(extractTransaction).not.toHaveBeenCalled()
+    const update = opsFor(ops, 'pending_telegram_transactions', 'update')[0]
+    expect(update.values).toMatchObject({
+      status: 'confirming',
+      missing_fields: [],
+    })
+    const values = update.values as {
+      payload: { resolved: ResolvedReferences; awaitingCategoryText?: boolean }
+    }
+    expect(values.payload.resolved.categoryId).toBe('c2')
+    expect(values.payload.resolved.categoryName).toBe('Groceries')
+    expect(values.payload.resolved.categorySource).toBe('user_choice')
+    expect(values.payload.awaitingCategoryText).toBeUndefined()
+  })
+
+  it('queues a brand-new category when nothing matches', async () => {
+    const active = awaitingCategoryRow()
+    const { supabase, ops } = mockSupabase(respondWith({ activeClarifying: active }))
+
+    await processIncoming(supabase, CHANNEL, 100, {
+      kind: 'text',
+      text: '  Pet   Supplies ',
+    })
+
+    const update = opsFor(ops, 'pending_telegram_transactions', 'update')[0]
+    const values = update.values as { payload: { resolved: ResolvedReferences } }
+    expect(values.payload.resolved.categoryId).toBeNull()
+    expect(values.payload.resolved.categoryName).toBe('Pet Supplies')
+    expect(values.payload.resolved.categorySource).toBe('user_new')
+    // Confirm card marks the category as new.
+    const confirmEdit = vi
+      .mocked(editMessageText)
+      .mock.calls.find(c => (c[2] as string).includes('Confirm this transaction?'))
+    expect(confirmEdit).toBeDefined()
+    expect(confirmEdit![2]).toContain('Pet Supplies (new)')
+  })
+
+  it('treats an amount-looking reply as a new transaction instead', async () => {
+    const active = awaitingCategoryRow()
+    vi.mocked(extractTransaction).mockResolvedValueOnce(EXTRACTED)
+    const { supabase, ops } = mockSupabase(respondWith({ activeClarifying: active }))
+
+    await processIncoming(supabase, CHANNEL, 100, {
+      kind: 'text',
+      text: '$20 lunch at Subway',
+    })
+
+    const deletes = opsFor(ops, 'pending_telegram_transactions', 'delete')
+    expect(deletes.some(d => d.filters.eq?.some(a => a[1] === 'p-old'))).toBe(true)
+    expect(extractTransaction).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-prompts on an empty reply without losing the clarification', async () => {
+    const active = awaitingCategoryRow()
+    const { supabase, ops } = mockSupabase(respondWith({ activeClarifying: active }))
+
+    await processIncoming(supabase, CHANNEL, 100, { kind: 'text', text: '   ' })
+
+    expect(vi.mocked(sendMessage).mock.calls[0][1]).toContain('I need a name')
+    const deletes = opsFor(ops, 'pending_telegram_transactions', 'delete')
+    expect(deletes.some(d => d.filters.eq?.some(a => a[1] === 'p-old'))).toBe(false)
+    expect(opsFor(ops, 'pending_telegram_transactions', 'update')).toHaveLength(0)
+  })
+
+  it('leaves category texts alone when Other… was not tapped', async () => {
+    const active = clarifyingRow(['category'])
+    vi.mocked(extractTransaction).mockResolvedValueOnce(EXTRACTED)
+    const { supabase, ops } = mockSupabase(respondWith({ activeClarifying: active }))
+
+    await processIncoming(supabase, CHANNEL, 100, { kind: 'text', text: 'Groceries' })
+
+    // Unchanged behavior: a plain text with no flag supersedes + re-extracts.
+    const deletes = opsFor(ops, 'pending_telegram_transactions', 'delete')
+    expect(deletes.some(d => d.filters.eq?.some(a => a[1] === 'p-old'))).toBe(true)
+    expect(extractTransaction).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('buildExtractorInput — documents', () => {
   const baseMsg = { message_id: 1, chat: { id: 100, type: 'private' as const }, date: 0 }
 

@@ -59,10 +59,12 @@ export function formatPendingSummary(
 
   let categoryLine: string
   if (resolved.categoryName) {
-    const suffix =
-      resolved.categorySource === 'merchant_default'
-        ? ' (from merchant default)'
-        : ''
+    let suffix = ''
+    if (resolved.categorySource === 'merchant_default') {
+      suffix = ' (from merchant default)'
+    } else if (resolved.categorySource === 'user_new' && !resolved.categoryId) {
+      suffix = ' (new)'
+    }
     categoryLine = `${resolved.categoryName}${suffix}`
   } else if (resolved.categoryId) {
     categoryLine = '✓ matched' // legacy payload without categoryName
@@ -176,7 +178,11 @@ export function buildQuestion(
       const merchantName = resolved.merchantName ?? extracted.merchant
       return {
         text: `${header}\n\n🏷 Pick a category${merchantName ? ` for ${merchantName}` : ''}:`,
-        keyboard: [...chunk(buttons, 3), cancelRow(pendingId)],
+        keyboard: [
+          ...chunk(buttons, 3),
+          [{ text: '➕ Other…', callback_data: `co:${pendingId}` }],
+          cancelRow(pendingId),
+        ],
       }
     }
     case 'account': {
@@ -219,5 +225,24 @@ export function buildQuestion(
           cancelRow(pendingId),
         ],
       }
+  }
+}
+
+/**
+ * Rendered after the user taps "Other…" on the category grid: asks for a
+ * free-text category name, with a way back to the button list.
+ */
+export function categoryTextPrompt(
+  pendingId: string,
+  extracted: ExtractedTransaction,
+  resolved: Partial<ResolvedReferences>
+): { text: string; keyboard: InlineKeyboardButton[][] } {
+  const header = formatKnownSoFar(extracted, resolved)
+  return {
+    text: `${header}\n\n🏷 What category should this go in? Reply with a name — I'll use the closest existing category, or create it if it's new.`,
+    keyboard: [
+      [{ text: '⬅️ Back to list', callback_data: `cg:${pendingId}` }],
+      cancelRow(pendingId),
+    ],
   }
 }

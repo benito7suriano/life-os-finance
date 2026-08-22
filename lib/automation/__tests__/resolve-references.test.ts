@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveReferences } from '../resolve-references'
+import { closestCategory, resolveReferences } from '../resolve-references'
 import type { ExtractedTransaction } from '../extract-transaction'
 import {
   mockSupabase,
@@ -199,5 +199,51 @@ describe('resolveReferences — transfers', () => {
     })
     expect(ctx.resolved.accountId).toBeNull()
     expect(ctx.resolved.toAccountId).toBeNull()
+  })
+})
+
+describe('closestCategory', () => {
+  const CATEGORIES = [
+    { id: 'c1', name: 'Coffee' },
+    { id: 'c2', name: 'Groceries' },
+    { id: 'c3', name: 'Food & Dining' },
+    { id: 'c4', name: 'Health & Wellness' },
+    { id: 'c5', name: 'Café' },
+  ]
+
+  it('matches exactly, ignoring case and surrounding whitespace', () => {
+    expect(closestCategory(CATEGORIES, '  groceries ')?.id).toBe('c2')
+  })
+
+  it('matches a singular/typo variant to the closest name', () => {
+    expect(closestCategory(CATEGORIES, 'grocery')?.id).toBe('c2')
+    expect(closestCategory(CATEGORIES, 'grocerys')?.id).toBe('c2')
+  })
+
+  it('matches a word inside a multi-word category', () => {
+    expect(closestCategory(CATEGORIES, 'dining')?.id).toBe('c3')
+    expect(closestCategory(CATEGORIES, 'food and dining')?.id).toBe('c3')
+  })
+
+  it('matches a typo against a single token of a multi-word name', () => {
+    expect(closestCategory(CATEGORIES, 'helth')?.id).toBe('c4')
+  })
+
+  it('ignores accents in both directions', () => {
+    expect(closestCategory(CATEGORIES, 'cafe')?.id).toBe('c5')
+    expect(closestCategory([{ id: 'c9', name: 'Cafe' }], 'café')?.id).toBe('c9')
+  })
+
+  it('returns null when nothing is close', () => {
+    expect(closestCategory(CATEGORIES, 'Pets')).toBeNull()
+    expect(closestCategory([], 'Pets')).toBeNull()
+  })
+
+  it('does not let a tiny input substring-match into a longer name', () => {
+    expect(closestCategory(CATEGORIES, 'co')).toBeNull()
+  })
+
+  it('returns null for empty or whitespace input', () => {
+    expect(closestCategory(CATEGORIES, '   ')).toBeNull()
   })
 })

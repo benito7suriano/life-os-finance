@@ -19,6 +19,19 @@ import type {
 export const MAX_CATEGORY_BUTTONS = 12
 
 /**
+ * Category counts as answered once matched to an id OR named by the user as a
+ * brand-new one ('user_new' — created at confirm time, id still null).
+ */
+export function categoryAnswered(
+  resolved: Pick<ResolvedReferences, 'categoryId' | 'categoryName' | 'categorySource'>
+): boolean {
+  return (
+    !!resolved.categoryId ||
+    (resolved.categorySource === 'user_new' && !!resolved.categoryName)
+  )
+}
+
+/**
  * Ordered list of unresolved required fields. amount → merchant → category →
  * account → date. Category is skipped when the user has no categories for the
  * direction (nullable column — don't dead-end). Account is asked only when
@@ -44,7 +57,7 @@ export function computeMissingFields(
   }
   if (!extracted.amount) missing.push('amount')
   if (!resolved.merchantName) missing.push('merchant')
-  if (!resolved.categoryId && counts.categories > 0) missing.push('category')
+  if (!categoryAnswered(resolved) && counts.categories > 0) missing.push('category')
   if (!resolved.accountId && counts.accounts >= 2) missing.push('account')
   if (extracted.dateAmbiguous) missing.push('date')
   return missing
@@ -136,6 +149,7 @@ export async function askNextQuestion(
 export type ClarificationAnswer =
   | { kind: 'extracted'; extracted: ExtractedTransaction }
   | { kind: 'choice'; field: 'category' | 'account' | 'to_account'; option: OptionItem }
+  | { kind: 'new_category'; name: string }
   | { kind: 'date'; date: string }
 
 /**
@@ -164,6 +178,10 @@ export async function applyAnswer(
       fresh.categoryId = resolved.categoryId
       fresh.categoryName = resolved.categoryName
       fresh.categorySource = 'user_choice'
+    } else if (resolved.categorySource === 'user_new' && resolved.categoryName) {
+      fresh.categoryId = null
+      fresh.categoryName = resolved.categoryName
+      fresh.categorySource = 'user_new'
     }
     if (resolved.accountSource === 'user_choice' && resolved.accountId) {
       fresh.accountId = resolved.accountId
@@ -191,6 +209,15 @@ export async function applyAnswer(
       resolved.accountName = answer.option.name
       resolved.accountSource = 'user_choice'
     }
+  } else if (answer.kind === 'new_category') {
+    // Creation is deferred to confirm time (like merchants) so cancelled
+    // transactions don't leave orphan categories.
+    resolved = {
+      ...resolved,
+      categoryId: null,
+      categoryName: answer.name,
+      categorySource: 'user_new',
+    }
   } else {
     extracted = { ...extracted, date: answer.date, dateAmbiguous: false }
   }
@@ -208,7 +235,7 @@ export async function applyAnswer(
     missing = pending.missing_fields.filter(f => {
       if (f === 'amount') return !extracted.amount
       if (f === 'merchant') return !resolved.merchantName
-      if (f === 'category') return !resolved.categoryId
+      if (f === 'category') return !categoryAnswered(resolved)
       if (f === 'account') return !resolved.accountId
       if (f === 'to_account') return !resolved.toAccountId
       if (f === 'date') return extracted.dateAmbiguous
@@ -222,6 +249,9 @@ export async function applyAnswer(
     resolved,
     direction: extracted.direction,
   }
+  // Any applied answer ends "type the category" mode. (The flag can only be
+  // set while category is the head field, so no other answer coexists with it.)
+  delete newPayload.awaitingCategoryText
   const done = missing.length === 0
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
 

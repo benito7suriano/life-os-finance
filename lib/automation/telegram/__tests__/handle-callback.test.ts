@@ -81,6 +81,8 @@ interface Fixture {
   merchantCreateError?: { message: string }
   learnError?: { message: string }
   txError?: { message: string }
+  categoryCreateError?: { message: string }
+  categoryRematch?: { id: string } | null
 }
 
 function respondWith(fx: Fixture) {
@@ -112,7 +114,18 @@ function respondWith(fx: Fixture) {
       if (op.action === 'select') return { data: { id: 'ch1', transactions_logged: 3 } }
       return {}
     }
-    if (op.table === 'categories') return { data: [] }
+    if (op.table === 'categories') {
+      if (op.action === 'insert') {
+        return fx.categoryCreateError
+          ? { data: null, error: fx.categoryCreateError }
+          : { data: { id: 'cat-new' } }
+      }
+      // ilike marks the race re-match lookup; other selects are list fetches.
+      if (op.action === 'select' && op.filters.ilike) {
+        return { data: fx.categoryRematch ?? null }
+      }
+      return { data: [] }
+    }
     return { data: [] }
   }
 }
@@ -236,6 +249,85 @@ describe('handleCallback — clarification buttons', () => {
   })
 })
 
+describe('handleCallback — Other… category flow', () => {
+  function clarifyingCategoryRow(): PendingRow {
+    return pendingRow({
+      status: 'clarifying',
+      missing_fields: ['category'],
+      payload: {
+        extracted: EXTRACTED,
+        resolved: {
+          ...RESOLVED,
+          categoryId: null,
+          categoryName: null,
+          categorySource: null,
+        },
+        direction: 'expense',
+        options: {
+          categories: [
+            { id: 'c1', name: 'Coffee' },
+            { id: 'c2', name: 'Groceries' },
+          ],
+        },
+      },
+    })
+  }
+
+  it('co switches the card to free-text mode and flags the payload', async () => {
+    const pending = clarifyingCategoryRow()
+    const { supabase, ops } = mockSupabase(respondWith({ pending }))
+
+    await handleCallback(supabase, cbQuery('co:p1'))
+
+    const update = opsFor(ops, 'pending_telegram_transactions', 'update')[0]
+    const values = update.values as {
+      payload: { awaitingCategoryText?: boolean }
+      expires_at: string
+    }
+    expect(values.payload.awaitingCategoryText).toBe(true)
+    expect(values.expires_at).toBeDefined()
+
+    const [, , text, opts] = vi.mocked(editMessageText).mock.calls[0]
+    expect(text).toContain('Reply with a name')
+    expect(opts!.keyboard![0][0]).toEqual({
+      text: '⬅️ Back to list',
+      callback_data: 'cg:p1',
+    })
+    expect(opts!.keyboard![1][0].callback_data).toBe('x:p1')
+  })
+
+  it('rejects co when the category question is not active', async () => {
+    const pending = pendingRow({ status: 'confirming', missing_fields: [] })
+    const { supabase, ops } = mockSupabase(respondWith({ pending }))
+
+    await handleCallback(supabase, cbQuery('co:p1'))
+
+    expect(answerCallbackQuery).toHaveBeenCalledWith(
+      'cb1',
+      expect.stringContaining('stale')
+    )
+    expect(opsFor(ops, 'pending_telegram_transactions', 'update')).toHaveLength(0)
+  })
+
+  it('cg clears the flag and re-renders the category grid', async () => {
+    const pending = clarifyingCategoryRow()
+    pending.payload.awaitingCategoryText = true
+    const { supabase, ops } = mockSupabase(respondWith({ pending }))
+
+    await handleCallback(supabase, cbQuery('cg:p1'))
+
+    const update = opsFor(ops, 'pending_telegram_transactions', 'update')[0]
+    const values = update.values as { payload: { awaitingCategoryText?: boolean } }
+    expect(values.payload.awaitingCategoryText).toBeUndefined()
+
+    const gridEdit = vi
+      .mocked(editMessageText)
+      .mock.calls.find(c => (c[2] as string).includes('Pick a category'))
+    expect(gridEdit).toBeDefined()
+    expect(gridEdit![3]!.keyboard![0][0].callback_data).toBe('cc:p1:0')
+  })
+})
+
 describe('handleCallback — confirm', () => {
   it('creates the merchant when unmatched and saves the transaction', async () => {
     const pending = pendingRow({
@@ -263,6 +355,68 @@ describe('handleCallback — confirm', () => {
       source: 'telegram',
     })
     expect(applyTransactionBalances).toHaveBeenCalledTimes(1)
+  })
+
+  it('creates a brand-new category at confirm time and uses it everywhere', async () => {
+    const pending = pendingRow({
+      payload: {
+        extracted: EXTRACTED,
+        resolved: {
+          ...RESOLVED,
+          categoryId: null,
+          categoryName: 'Pets',
+          categorySource: 'user_new',
+        },
+        direction: 'expense',
+      },
+    })
+    const { supabase, ops } = mockSupabase(respondWith({ pending }))
+
+    await handleCallback(supabase, cbQuery('c:p1'))
+
+    const catInsert = opsFor(ops, 'categories', 'insert')[0]
+    expect(catInsert.values).toMatchObject({
+      user_id: 'u1',
+      name: 'Pets',
+      type: 'expense',
+      is_system: false,
+    })
+    const txInsert = opsFor(ops, 'transactions', 'insert')[0]
+    expect(txInsert.values).toMatchObject({ category_id: 'cat-new' })
+    // Merchant learning uses the freshly created id.
+    const learn = opsFor(ops, 'merchants', 'update')[0]
+    expect(learn.values).toMatchObject({ default_category_id: 'cat-new' })
+    const savedEdit = vi
+      .mocked(editMessageText)
+      .mock.calls.find(c => (c[2] as string).includes('✅ Saved.'))
+    expect(savedEdit).toBeDefined()
+  })
+
+  it('falls back to a race re-match when the category insert fails', async () => {
+    const pending = pendingRow({
+      payload: {
+        extracted: EXTRACTED,
+        resolved: {
+          ...RESOLVED,
+          categoryId: null,
+          categoryName: 'Pets',
+          categorySource: 'user_new',
+        },
+        direction: 'expense',
+      },
+    })
+    const { supabase, ops } = mockSupabase(
+      respondWith({
+        pending,
+        categoryCreateError: { message: 'duplicate key' },
+        categoryRematch: { id: 'cat-race' },
+      })
+    )
+
+    await handleCallback(supabase, cbQuery('c:p1'))
+
+    const txInsert = opsFor(ops, 'transactions', 'insert')[0]
+    expect(txInsert.values).toMatchObject({ category_id: 'cat-race' })
   })
 
   it('writes the confirmed category back as the merchant default', async () => {

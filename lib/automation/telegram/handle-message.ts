@@ -13,7 +13,11 @@ import {
   type ExtractedTransaction,
   type ExtractorInput,
 } from '../extract-transaction'
-import { resolveReferences } from '../resolve-references'
+import {
+  closestCategory,
+  resolveReferences,
+  type OptionItem,
+} from '../resolve-references'
 import {
   applyAnswer,
   askNextQuestion,
@@ -140,6 +144,13 @@ export async function processIncoming(
   // Free-text reply to an active clarification question?
   if (active && input.kind === 'text') {
     const head = active.missing_fields[0]
+    // After "Other…" was tapped, the reply names the category directly —
+    // no extractor round-trip needed.
+    if (head === 'category' && active.payload.awaitingCategoryText) {
+      const handled = await handleCategoryText(supabase, active, chatId, input.text)
+      if (handled) return
+      // Looked like a new transaction → fall through to supersede + fresh run.
+    }
     if (head === 'amount' || head === 'merchant' || head === 'date') {
       let merge
       try {
@@ -272,6 +283,60 @@ export async function processIncoming(
       keyboard: confirmKeyboard(pending.id),
     })
   }
+}
+
+/** Category names are short labels; leading amounts mean a new transaction. */
+const MAX_CATEGORY_NAME_LENGTH = 60
+const LEADING_AMOUNT = /^[$€£]?\s*\d+(?:[.,]\d+)?\b/
+
+/**
+ * Handles the free-text reply after the user tapped "Other…" on the category
+ * card: matches the closest existing category for the direction, or queues a
+ * brand-new one (created at confirm time). Returns false when the reply looks
+ * like a new transaction, so the caller supersedes and re-extracts instead.
+ */
+async function handleCategoryText(
+  supabase: FinanceSupabase,
+  pending: PendingRow,
+  chatId: number,
+  text: string
+): Promise<boolean> {
+  const name = text.replace(/\s+/g, ' ').trim()
+
+  // "$12 lunch at Subway" is a new transaction, not a category name.
+  if (LEADING_AMOUNT.test(name)) return false
+
+  if (!name || name.length > MAX_CATEGORY_NAME_LENGTH) {
+    await sendMessage(
+      chatId,
+      name
+        ? `⚠️ That's too long for a category name — try something under ${MAX_CATEGORY_NAME_LENGTH} characters.`
+        : '⚠️ I need a name — reply with a short category name (e.g. "Pets").'
+    )
+    return true
+  }
+
+  // Match against ALL of the user's categories for this direction, not just
+  // the (possibly capped) button list frozen into the card.
+  const { data, error } = await supabase
+    .from('categories')
+    .select('id, name')
+    .eq('user_id', pending.user_id)
+    .eq('type', pending.payload.direction)
+    .order('name', { ascending: true })
+  if (error) {
+    throw new Error(`categories lookup failed: ${error.message}`)
+  }
+
+  const match = closestCategory((data ?? []) as OptionItem[], name)
+  await applyAnswer(
+    supabase,
+    pending,
+    match
+      ? { kind: 'choice', field: 'category', option: match }
+      : { kind: 'new_category', name }
+  )
+  return true
 }
 
 function friendlyCause(cause: string): string {

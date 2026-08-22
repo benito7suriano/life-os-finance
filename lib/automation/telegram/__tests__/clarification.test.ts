@@ -82,6 +82,16 @@ describe('computeMissingFields', () => {
     ).toEqual([])
   })
 
+  it('treats a queued brand-new category (user_new) as answered', () => {
+    const resolved: ResolvedReferences = {
+      ...RESOLVED,
+      categoryId: null,
+      categoryName: 'Pets',
+      categorySource: 'user_new',
+    }
+    expect(computeMissingFields(EXTRACTED, resolved, counts)).toEqual([])
+  })
+
   it('asks for date only when the extractor flagged ambiguity', () => {
     expect(
       computeMissingFields({ ...EXTRACTED, date: null }, RESOLVED, counts)
@@ -181,6 +191,11 @@ describe('askNextQuestion', () => {
     const keyboard = opts!.keyboard!
     expect(keyboard[0][0]).toEqual({ text: 'Coffee', callback_data: 'cc:p1:0' })
     expect(keyboard[0][1]).toEqual({ text: 'Groceries', callback_data: 'cc:p1:1' })
+    // Second-to-last row is "Other…" for a free-text category.
+    expect(keyboard[keyboard.length - 2][0]).toEqual({
+      text: '➕ Other…',
+      callback_data: 'co:p1',
+    })
     // Last row is Cancel.
     expect(keyboard[keyboard.length - 1][0].callback_data).toBe('x:p1')
   })
