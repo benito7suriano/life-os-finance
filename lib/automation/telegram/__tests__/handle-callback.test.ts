@@ -490,3 +490,183 @@ describe('handleCallback — confirm', () => {
     )
   })
 })
+
+describe('handleCallback — transfers', () => {
+  const TRANSFER_EXTRACTED: ExtractedTransaction = {
+    amount: 63806.68,
+    currency: 'DOP',
+    merchant: null,
+    categoryHint: null,
+    accountHint: 'Cuenta de Ahorros 828289652',
+    date: '2026-08-22',
+    dateAmbiguous: false,
+    notes: null,
+    direction: 'transfer',
+    confidence: 0.9,
+    toAccountHint: 'Tarjeta de crédito / 4857',
+    toAmount: 1065.22,
+    toCurrency: 'USD',
+  }
+
+  const TRANSFER_RESOLVED: ResolvedReferences = {
+    merchantId: null,
+    merchantName: null,
+    categoryId: null,
+    categoryName: null,
+    categorySource: null,
+    accountId: 'a-dop',
+    accountName: 'Cuenta de Ahorros',
+    accountSource: 'hint',
+    toAccountId: 'a-usd',
+    toAccountName: 'Visa Infinite',
+    toAccountSource: 'hint',
+    notes: { merchantMatched: false, categoryMatched: false, accountMatched: true },
+  }
+
+  function transferPending(overrides: Partial<PendingRow> = {}): PendingRow {
+    return pendingRow({
+      payload: {
+        extracted: TRANSFER_EXTRACTED,
+        resolved: TRANSFER_RESOLVED,
+        direction: 'transfer',
+      },
+      ...overrides,
+    })
+  }
+
+  /** accounts.currency lookups answer per queried id. */
+  function transferResponder(fx: { pending: PendingRow; txError?: { message: string } }) {
+    return (op: Op) => {
+      if (op.table === 'accounts') {
+        const id = op.filters.eq?.find(args => args[0] === 'id')?.[1]
+        return { data: { currency: id === 'a-dop' ? 'DOP' : 'USD' } }
+      }
+      return respondWith({ pending: fx.pending, txError: fx.txError })(op)
+    }
+  }
+
+  it('confirm inserts one cross-currency transfer row and applies both legs', async () => {
+    const pending = transferPending()
+    const { supabase, ops } = mockSupabase(transferResponder({ pending }))
+
+    await handleCallback(supabase, cbQuery('c:p1'))
+
+    const insert = opsFor(ops, 'transactions', 'insert')[0]
+    expect(insert.values).toMatchObject({
+      type: 'transfer',
+      amount: 63806.68,
+      currency: 'DOP',
+      to_amount: 1065.22,
+      to_currency: 'USD',
+      from_account_id: 'a-dop',
+      to_account_id: 'a-usd',
+      date: '2026-08-22',
+      source: 'telegram',
+      source_app: 'telegram-bot',
+    })
+    expect((insert.values as Record<string, unknown>).category_id).toBeUndefined()
+
+    // No merchant creation or learning for transfers.
+    expect(opsFor(ops, 'merchants', 'insert')).toHaveLength(0)
+    expect(opsFor(ops, 'merchants', 'update')).toHaveLength(0)
+
+    expect(applyTransactionBalances).toHaveBeenCalledWith(
+      supabase,
+      {
+        type: 'transfer',
+        amount: 63806.68,
+        toAmount: 1065.22,
+        fromAccountId: 'a-dop',
+        toAccountId: 'a-usd',
+      },
+      1
+    )
+
+    const finalText = vi.mocked(editMessageText).mock.calls.at(-1)?.[2] as string
+    expect(finalText).toContain('✅ Saved.')
+    expect(finalText).toContain('63,806.68 DOP → $1,065.22')
+  })
+
+  it('confirm swaps the legs when the extractor read them backwards', async () => {
+    const pending = transferPending()
+    pending.payload.extracted = {
+      ...TRANSFER_EXTRACTED,
+      amount: 1065.22,
+      currency: 'USD',
+      toAmount: 63806.68,
+      toCurrency: 'DOP',
+    }
+    const { supabase, ops } = mockSupabase(transferResponder({ pending }))
+
+    await handleCallback(supabase, cbQuery('c:p1'))
+
+    const insert = opsFor(ops, 'transactions', 'insert')[0]
+    expect(insert.values).toMatchObject({
+      amount: 63806.68,
+      currency: 'DOP',
+      to_amount: 1065.22,
+      to_currency: 'USD',
+    })
+  })
+
+  it('confirm refuses a transfer whose destination is unresolved', async () => {
+    const pending = transferPending()
+    pending.payload.resolved = { ...TRANSFER_RESOLVED, toAccountId: null }
+    const { supabase, ops } = mockSupabase(transferResponder({ pending }))
+
+    await handleCallback(supabase, cbQuery('c:p1'))
+
+    expect(opsFor(ops, 'transactions', 'insert')).toHaveLength(0)
+    const text = vi.mocked(editMessageText).mock.calls.at(-1)?.[2] as string
+    expect(text).toContain('two different accounts')
+  })
+
+  it('ct button applies the destination account choice', async () => {
+    const pending = transferPending({
+      status: 'clarifying',
+      missing_fields: ['to_account'],
+    })
+    pending.payload.resolved = { ...TRANSFER_RESOLVED, toAccountId: null, toAccountName: null, toAccountSource: null }
+    pending.payload.options = {
+      accounts: [
+        { id: 'a-dop', name: 'Cuenta de Ahorros' },
+        { id: 'a-usd', name: 'Visa Infinite' },
+      ],
+    }
+    const { supabase, ops } = mockSupabase(transferResponder({ pending }))
+
+    await handleCallback(supabase, cbQuery('ct:p1:1'))
+
+    const update = opsFor(ops, 'pending_telegram_transactions', 'update')[0]
+    const values = update.values as {
+      status: string
+      payload: { resolved: ResolvedReferences }
+    }
+    expect(values.status).toBe('confirming')
+    expect(values.payload.resolved.toAccountId).toBe('a-usd')
+    expect(values.payload.resolved.toAccountSource).toBe('user_choice')
+  })
+
+  it('ct button rejects picking the source account as the destination', async () => {
+    const pending = transferPending({
+      status: 'clarifying',
+      missing_fields: ['to_account'],
+    })
+    pending.payload.resolved = { ...TRANSFER_RESOLVED, toAccountId: null }
+    pending.payload.options = {
+      accounts: [
+        { id: 'a-dop', name: 'Cuenta de Ahorros' },
+        { id: 'a-usd', name: 'Visa Infinite' },
+      ],
+    }
+    const { supabase, ops } = mockSupabase(transferResponder({ pending }))
+
+    await handleCallback(supabase, cbQuery('ct:p1:0'))
+
+    expect(vi.mocked(answerCallbackQuery)).toHaveBeenCalledWith(
+      'cb1',
+      expect.stringContaining('source account')
+    )
+    expect(opsFor(ops, 'pending_telegram_transactions', 'update')).toHaveLength(0)
+  })
+})

@@ -227,3 +227,54 @@ describe('askNextQuestion', () => {
     ])
   })
 })
+
+describe('computeMissingFields — transfers', () => {
+  const counts = { categories: 5, accounts: 3 }
+  const TRANSFER: ExtractedTransaction = {
+    ...EXTRACTED,
+    merchant: null,
+    categoryHint: null,
+    direction: 'transfer',
+    toAccountHint: 'Visa 4857',
+    toAmount: 1065.22,
+    toCurrency: 'USD',
+  }
+  const TRANSFER_RESOLVED: ResolvedReferences = {
+    ...RESOLVED,
+    merchantId: null,
+    merchantName: null,
+    categoryId: null,
+    categoryName: null,
+    categorySource: null,
+    accountId: 'a-dop',
+    accountName: 'Cuenta de Ahorros',
+    accountSource: 'hint',
+    toAccountId: 'a-usd',
+    toAccountName: 'Visa Infinite',
+    toAccountSource: 'hint',
+  }
+
+  it('asks for nothing when both accounts and the amount are resolved', () => {
+    expect(computeMissingFields(TRANSFER, TRANSFER_RESOLVED, counts)).toEqual([])
+  })
+
+  it('never asks for merchant or category, and orders amount → account → to_account → date', () => {
+    const extracted = { ...TRANSFER, amount: null, dateAmbiguous: true }
+    const resolved = {
+      ...TRANSFER_RESOLVED,
+      accountId: null,
+      toAccountId: null,
+    }
+    expect(computeMissingFields(extracted, resolved, counts)).toEqual([
+      'amount',
+      'account',
+      'to_account',
+      'date',
+    ])
+  })
+
+  it('asks only for the unresolved destination', () => {
+    const resolved = { ...TRANSFER_RESOLVED, toAccountId: null }
+    expect(computeMissingFields(TRANSFER, resolved, counts)).toEqual(['to_account'])
+  })
+})

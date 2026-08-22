@@ -22,10 +22,18 @@ export interface ExtractedTransaction {
   dateAmbiguous: boolean
   /** Anything the user said that doesn't fit other fields. */
   notes: string | null
-  /** 'income' | 'expense' — defaults to 'expense' when uncertain. */
-  direction: 'income' | 'expense'
+  /** 'income' | 'expense' | 'transfer' — defaults to 'expense' when uncertain. */
+  direction: 'income' | 'expense' | 'transfer'
   /** 0-1, the extractor's confidence in `amount` and `merchant`. */
   confidence: number
+  /** Transfers only: destination account hint (e.g. "Tarjeta de crédito 4857").
+   * Optional so legacy stored payloads (pre-transfer) still typecheck. */
+  toAccountHint?: string | null
+  /** Transfers only: amount credited to the destination when it differs from
+   * `amount` (cross-currency). Positive. */
+  toAmount?: number | null
+  /** Transfers only: ISO currency of `toAmount`. */
+  toCurrency?: string | null
 }
 
 export type ExtractorInput =
@@ -46,8 +54,9 @@ Fields:
 - date: YYYY-MM-DD; null if not stated. "yesterday" → resolve relative to today.
 - dateAmbiguous: see date rules below.
 - notes: anything that doesn't fit other fields.
-- direction: "expense" unless clearly income.
+- direction: "expense" unless clearly income or a transfer between the user's own accounts.
 - confidence: 0-1, your confidence in amount + merchant.
+- toAccountHint / toAmount / toCurrency: transfers only (see transfer rules). Null otherwise.
 
 Rules:
 - Receipts may be in ANY language, commonly Spanish (El Salvador / Latin America). The amount is the grand total: labels like TOTAL, VENTA TOTAL, TOTAL A PAGAR, GRAN TOTAL. NEVER use SUB-TOTAL/SUBTOTAL, IVA (tax), or PROPINA (tip) as the amount. If both a subtotal and a total appear, use the total.
@@ -55,6 +64,12 @@ Rules:
 - Set dateAmbiguous=true ONLY when a stated date genuinely cannot be disambiguated (both parts ≤ 12 AND language/context gives no signal, or an unclear relative phrase). When no date is stated at all, return date=null and dateAmbiguous=false.
 - merchant is the business name, usually the largest text at the top of a receipt. Strip branch/location suffixes when they are clearly a location (e.g. "THE COFFEE CUP COL. MEDICA" → "The Coffee Cup"). Return normal title case, not ALL CAPS.
 - currency: "$" amounts on Salvadoran receipts are USD. Infer from country/language context; null if truly unknown.
+Transfer rules:
+- direction="transfer" when money moves between the user's OWN accounts: bank transfer confirmations, credit-card payments from a bank account (e.g. "PAGO A TARJETAS DE CRÉDITO", "PAGO DE TARJETA", "TRANSFERENCIA ENTRE CUENTAS", "pay my visa from savings"). A credit-card payment is a transfer TO the card account, NOT an expense.
+- accountHint = the SOURCE account (labels like "Desde cuenta", "Cuenta origen", "From account"). toAccountHint = the DESTINATION (labels like "Beneficiario", "Hacia", "Cuenta destino", "Tarjeta de crédito"). Include any account/card numbers shown — last digits help match the user's accounts.
+- amount = what leaves the source account, in the source account's currency. toAmount/toCurrency = what arrives at the destination, when the two currencies differ; null for same-currency transfers.
+- Bank apps often show both currencies with a "Tasa de cambio"/exchange-rate line (e.g. US$1,065.22 and RD$63,806.68 at RD$59.90/US$1.00). Use the rate line and account labels to assign each amount to the correct leg: a Dominican savings account ("Cuenta de Ahorros", RD$) is the DOP leg; a USD card is the USD leg. If unsure which leg is the source, still return both amounts — pick the more likely assignment and lower confidence.
+- Transfers usually have no merchant or category — return null for both.
 - Thermal receipts are often low-contrast, skewed, or partly cut off — read carefully. Prefer returning partial fields (amount only, merchant only) over failing. Only return null amount if no plausible total is visible.
 - Never invent merchants — return null if unclear.`
 
@@ -69,8 +84,11 @@ const EXTRACTED_SCHEMA = {
     date: { type: 'STRING', nullable: true },
     dateAmbiguous: { type: 'BOOLEAN' },
     notes: { type: 'STRING', nullable: true },
-    direction: { type: 'STRING', enum: ['expense', 'income'] },
+    direction: { type: 'STRING', enum: ['expense', 'income', 'transfer'] },
     confidence: { type: 'NUMBER' },
+    toAccountHint: { type: 'STRING', nullable: true },
+    toAmount: { type: 'NUMBER', nullable: true },
+    toCurrency: { type: 'STRING', nullable: true },
   },
   required: ['direction', 'confidence', 'dateAmbiguous'],
 }
@@ -261,11 +279,21 @@ function coerceExtracted(parsed: Partial<ExtractedTransaction>): ExtractedTransa
     date: typeof parsed.date === 'string' ? parsed.date : null,
     dateAmbiguous: parsed.dateAmbiguous === true,
     notes: typeof parsed.notes === 'string' ? parsed.notes : null,
-    direction: parsed.direction === 'income' ? 'income' : 'expense',
+    direction:
+      parsed.direction === 'income' || parsed.direction === 'transfer'
+        ? parsed.direction
+        : 'expense',
     confidence:
       typeof parsed.confidence === 'number'
         ? Math.max(0, Math.min(1, parsed.confidence))
         : 0.5,
+    toAccountHint:
+      typeof parsed.toAccountHint === 'string' ? parsed.toAccountHint : null,
+    toAmount:
+      typeof parsed.toAmount === 'number' && parsed.toAmount > 0
+        ? parsed.toAmount
+        : null,
+    toCurrency: typeof parsed.toCurrency === 'string' ? parsed.toCurrency : null,
   }
 }
 

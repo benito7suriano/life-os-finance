@@ -46,6 +46,15 @@ export function computeMissingFields(
   counts: { categories: number; accounts: number }
 ): MissingField[] {
   const missing: MissingField[] = []
+  // Transfers: no merchant/category; both accounts are required (a <2-account
+  // ledger is rejected upstream before clarification starts).
+  if (extracted.direction === 'transfer') {
+    if (!extracted.amount) missing.push('amount')
+    if (!resolved.accountId) missing.push('account')
+    if (!resolved.toAccountId) missing.push('to_account')
+    if (extracted.dateAmbiguous) missing.push('date')
+    return missing
+  }
   if (!extracted.amount) missing.push('amount')
   if (!resolved.merchantName) missing.push('merchant')
   if (!categoryAnswered(resolved) && counts.categories > 0) missing.push('category')
@@ -109,7 +118,7 @@ export async function askNextQuestion(
       lists.categories
     )
   }
-  if (field === 'account' && !options.accounts) {
+  if ((field === 'account' || field === 'to_account') && !options.accounts) {
     options.accounts = lists.accounts
   }
 
@@ -139,7 +148,7 @@ export async function askNextQuestion(
 
 export type ClarificationAnswer =
   | { kind: 'extracted'; extracted: ExtractedTransaction }
-  | { kind: 'choice'; field: 'category' | 'account'; option: OptionItem }
+  | { kind: 'choice'; field: 'category' | 'account' | 'to_account'; option: OptionItem }
   | { kind: 'new_category'; name: string }
   | { kind: 'date'; date: string }
 
@@ -179,6 +188,11 @@ export async function applyAnswer(
       fresh.accountName = resolved.accountName
       fresh.accountSource = 'user_choice'
     }
+    if (resolved.toAccountSource === 'user_choice' && resolved.toAccountId) {
+      fresh.toAccountId = resolved.toAccountId
+      fresh.toAccountName = resolved.toAccountName
+      fresh.toAccountSource = 'user_choice'
+    }
     resolved = fresh
   } else if (answer.kind === 'choice') {
     resolved = { ...resolved }
@@ -186,6 +200,10 @@ export async function applyAnswer(
       resolved.categoryId = answer.option.id
       resolved.categoryName = answer.option.name
       resolved.categorySource = 'user_choice'
+    } else if (answer.field === 'to_account') {
+      resolved.toAccountId = answer.option.id
+      resolved.toAccountName = answer.option.name
+      resolved.toAccountSource = 'user_choice'
     } else {
       resolved.accountId = answer.option.id
       resolved.accountName = answer.option.name
@@ -219,6 +237,7 @@ export async function applyAnswer(
       if (f === 'merchant') return !resolved.merchantName
       if (f === 'category') return !categoryAnswered(resolved)
       if (f === 'account') return !resolved.accountId
+      if (f === 'to_account') return !resolved.toAccountId
       if (f === 'date') return extracted.dateAmbiguous
       return false
     })
@@ -269,7 +288,7 @@ export async function applyAnswer(
       const options = newPayload.options ?? {}
       const needsLists =
         (next === 'category' && !options.categories) ||
-        (next === 'account' && !options.accounts)
+        ((next === 'account' || next === 'to_account') && !options.accounts)
       if (needsLists) {
         const ctx = await resolveReferences(supabase, pending.user_id, extracted)
         lists = { categories: ctx.categories, accounts: ctx.accounts }

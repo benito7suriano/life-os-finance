@@ -89,8 +89,9 @@ export async function handleMessage(
         '',
         '• Text: "$12 coffee at Blue Bottle yesterday"',
         '• Voice: hold the mic button and say it',
-        '• Photo: snap a receipt',
+        '• Photo: snap a receipt or a bank transfer screen',
         '• File: a PDF or image of a receipt/statement',
+        '• Transfers: "moved RD$5,000 from savings to my visa" or a payment screenshot',
         '',
         "If something's unclear I'll ask, then show a Confirm/Cancel before saving.",
       ].join('\n')
@@ -201,6 +202,14 @@ export async function processIncoming(
     await sendMessage(
       chatId,
       '⚠️ You don\'t have any accounts yet. Open the app and add an account first — then I can log transactions.'
+    )
+    return
+  }
+
+  if (extracted.direction === 'transfer' && ctx.accounts.length < 2) {
+    await sendMessage(
+      chatId,
+      '⚠️ That looks like a transfer, but you only have one account. Add the other account in the app first — then I can log it.'
     )
     return
   }

@@ -151,6 +151,57 @@ describe('resolveReferences', () => {
   })
 })
 
+describe('resolveReferences — transfers', () => {
+  const TRANSFER: ExtractedTransaction = {
+    ...BASE,
+    merchant: null,
+    direction: 'transfer',
+    amount: 63806.68,
+    currency: 'DOP',
+    accountHint: 'Cuenta de Ahorros 828289652',
+    toAccountHint: 'Tarjeta de crédito / 4857',
+    toAmount: 1065.22,
+    toCurrency: 'USD',
+  }
+
+  const TWO_ACCOUNTS = [
+    { id: 'a-dop', name: 'Cuenta de Ahorros', last_4_digits: '9652' },
+    { id: 'a-usd', name: 'Visa Infinite', last_4_digits: '4857' },
+  ]
+
+  it('resolves both legs via name and last-4 digits', async () => {
+    const { supabase } = mockSupabase(tables({ accounts: TWO_ACCOUNTS }))
+    const ctx = await resolveReferences(supabase, 'u1', TRANSFER)
+    expect(ctx.resolved.accountId).toBe('a-dop')
+    expect(ctx.resolved.toAccountId).toBe('a-usd')
+    expect(ctx.resolved.toAccountName).toBe('Visa Infinite')
+    expect(ctx.resolved.toAccountSource).toBe('hint')
+  })
+
+  it('never lets the destination collide with the resolved source', async () => {
+    const { supabase } = mockSupabase(tables({ accounts: TWO_ACCOUNTS }))
+    const ctx = await resolveReferences(supabase, 'u1', {
+      ...TRANSFER,
+      toAccountHint: 'cuenta de ahorros', // same account as the source hint
+    })
+    expect(ctx.resolved.accountId).toBe('a-dop')
+    expect(ctx.resolved.toAccountId).toBeNull()
+  })
+
+  it('skips the single-account default for transfers', async () => {
+    const { supabase } = mockSupabase(
+      tables({ accounts: [{ id: 'a1', name: 'Cash', last_4_digits: null }] })
+    )
+    const ctx = await resolveReferences(supabase, 'u1', {
+      ...TRANSFER,
+      accountHint: null,
+      toAccountHint: null,
+    })
+    expect(ctx.resolved.accountId).toBeNull()
+    expect(ctx.resolved.toAccountId).toBeNull()
+  })
+})
+
 describe('closestCategory', () => {
   const CATEGORIES = [
     { id: 'c1', name: 'Coffee' },

@@ -9,12 +9,18 @@ import type { OptionItem, ResolvedReferences } from '../resolve-references'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type FinanceSupabase = SupabaseClient<any, any, any>
 
-export type MissingField = 'amount' | 'merchant' | 'category' | 'account' | 'date'
+export type MissingField =
+  | 'amount'
+  | 'merchant'
+  | 'category'
+  | 'account'
+  | 'to_account'
+  | 'date'
 
 export interface PendingPayload {
   extracted: ExtractedTransaction
   resolved: ResolvedReferences
-  direction: 'income' | 'expense'
+  direction: 'income' | 'expense' | 'transfer'
   /** Frozen button lists — callback indexes resolve against these. */
   options?: {
     categories?: OptionItem[]
