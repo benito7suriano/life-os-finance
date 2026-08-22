@@ -20,6 +20,9 @@ export interface PendingPayload {
     categories?: OptionItem[]
     accounts?: OptionItem[]
   }
+  /** Set when the user tapped "Other…" on the category grid — the next text
+   *  reply is a category name, not a new transaction. */
+  awaitingCategoryText?: boolean
 }
 
 export interface PendingRow {

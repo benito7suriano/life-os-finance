@@ -4,6 +4,8 @@
 //   c:<pendingId>        confirm
 //   x:<pendingId>        cancel (any state)
 //   cc:<pendingId>:<i>   category = payload.options.categories[i]
+//   co:<pendingId>       category = Other… → ask for a free-text name
+//   cg:<pendingId>       back from the free-text prompt to the category grid
 //   ca:<pendingId>:<i>   account  = payload.options.accounts[i]
 //   cd:<pendingId>:t|y   date = today | yesterday
 
@@ -13,11 +15,12 @@ import {
   type TelegramCallbackQuery,
 } from '@/lib/telegram/client'
 import { applyTransactionBalances } from '@/lib/finance/apply-balances'
-import { applyAnswer } from './clarification'
-import { formatPendingSummary } from './format'
+import { applyAnswer, askNextQuestion } from './clarification'
+import { categoryTextPrompt, formatPendingSummary } from './format'
 import {
   PENDING_COLUMNS,
   type FinanceSupabase,
+  type PendingPayload,
   type PendingRow,
 } from './types'
 
@@ -106,6 +109,63 @@ export async function handleCallback(
       })
       return
     }
+    case 'co': {
+      if (
+        pending.status !== 'clarifying' ||
+        pending.missing_fields[0] !== 'category'
+      ) {
+        await answerCallbackQuery(cb.id, 'That button is stale — use the latest card.')
+        return
+      }
+      await answerCallbackQuery(cb.id)
+      const payload: PendingPayload = {
+        ...pending.payload,
+        awaitingCategoryText: true,
+      }
+      const { error } = await supabase
+        .from('pending_telegram_transactions')
+        .update({
+          payload,
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        })
+        .eq('id', pending.id)
+      if (error) {
+        throw new Error(`pending update failed: ${error.message}`)
+      }
+      const { text, keyboard } = categoryTextPrompt(
+        pending.id,
+        payload.extracted,
+        payload.resolved
+      )
+      await editMessageText(chatId, messageId, text, { keyboard })
+      return
+    }
+    case 'cg': {
+      if (
+        pending.status !== 'clarifying' ||
+        pending.missing_fields[0] !== 'category'
+      ) {
+        await answerCallbackQuery(cb.id, 'That button is stale — use the latest card.')
+        return
+      }
+      await answerCallbackQuery(cb.id)
+      if (pending.payload.awaitingCategoryText) {
+        const payload: PendingPayload = { ...pending.payload }
+        delete payload.awaitingCategoryText
+        const { error } = await supabase
+          .from('pending_telegram_transactions')
+          .update({ payload })
+          .eq('id', pending.id)
+        if (error) {
+          throw new Error(`pending update failed: ${error.message}`)
+        }
+        pending.payload = payload
+      }
+      // Options were frozen when the grid was first rendered ('co' is only
+      // reachable from it), so askNextQuestion re-renders without lists.
+      await askNextQuestion(supabase, pending, { categories: [], accounts: [] })
+      return
+    }
     case 'cd': {
       const valid =
         pending.status === 'clarifying' &&
@@ -184,6 +244,41 @@ async function confirmPending(
       if (existing) resolved.merchantId = existing.id
       else if (createErr) {
         console.error('[telegram-webhook] merchant create failed', createErr)
+      }
+    }
+  }
+
+  // Create the category now if the user named a brand-new one — deferred from
+  // clarification time so cancelled transactions don't leave orphans.
+  if (
+    !resolved.categoryId &&
+    resolved.categorySource === 'user_new' &&
+    resolved.categoryName
+  ) {
+    const { data: created, error: createErr } = await supabase
+      .from('categories')
+      .insert({
+        user_id: pending.user_id,
+        name: resolved.categoryName,
+        type: direction,
+        is_system: false,
+      })
+      .select('id')
+      .single()
+    if (!createErr && created) {
+      resolved.categoryId = created.id
+    } else {
+      // Possible race with a concurrent create — try to re-match by name.
+      const { data: existing } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('user_id', pending.user_id)
+        .eq('type', direction)
+        .ilike('name', resolved.categoryName.replace(/[\\%_]/g, m => `\\${m}`))
+        .maybeSingle()
+      if (existing) resolved.categoryId = existing.id
+      else if (createErr) {
+        console.error('[telegram-webhook] category create failed', createErr)
       }
     }
   }

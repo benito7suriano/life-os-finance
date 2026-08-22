@@ -19,7 +19,9 @@ export interface ResolvedReferences {
   merchantName: string | null
   categoryId: string | null
   categoryName: string | null
-  categorySource: 'hint' | 'merchant_default' | 'user_choice' | null
+  /** 'user_new' = user named a category that doesn't exist yet; it is created
+   *  at confirm time (categoryId stays null until then). */
+  categorySource: 'hint' | 'merchant_default' | 'user_choice' | 'user_new' | null
   accountId: string | null
   accountName: string | null
   accountSource: 'hint' | 'default' | 'user_choice' | null
@@ -91,6 +93,107 @@ function matchAccount(rows: AccountRow[], hint: string | null): AccountRow | nul
 
   // 2. fallback to name match
   return bestMatch(rows, hint)
+}
+
+const CLOSEST_CATEGORY_THRESHOLD = 0.72
+
+/** Case/diacritic-insensitive, whitespace-collapsed comparison form. */
+function normalizeName(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    const curr = [i]
+    for (let j = 1; j <= b.length; j++) {
+      curr[j] = Math.min(
+        prev[j] + 1,
+        curr[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      )
+    }
+    prev = curr
+  }
+  return prev[b.length]
+}
+
+function similarity(a: string, b: string): number {
+  const max = Math.max(a.length, b.length)
+  return max === 0 ? 1 : 1 - levenshtein(a, b) / max
+}
+
+/** Light plural stemming per token: "groceries"→"grocery", "pets"→"pet". */
+function stemToken(t: string): string {
+  if (t.length > 4 && t.endsWith('ies')) return `${t.slice(0, -3)}y`
+  if (t.length > 3 && t.endsWith('s')) return t.slice(0, -1)
+  return t
+}
+
+function stemName(s: string): string {
+  return s.split(' ').map(stemToken).join(' ')
+}
+
+function nameScore(input: string, name: string): number {
+  if (input === name) return 1
+  // Substring either direction — the contained side must be long enough to be
+  // meaningful ("co" must not match into "Coffee").
+  if (
+    (input.length >= 3 && name.includes(input)) ||
+    (name.length >= 3 && input.includes(name))
+  ) {
+    return 0.95
+  }
+  let score = similarity(input, name)
+  // Token level, so "helth" still finds "Health & Wellness". Slightly
+  // discounted: a matching word is weaker evidence than the whole name.
+  const inputTokens = input.split(' ').filter(t => t.length >= 3)
+  const nameTokens = name.split(' ').filter(t => t.length >= 3)
+  for (const it of inputTokens) {
+    for (const nt of nameTokens) {
+      score = Math.max(score, similarity(it, nt) - 0.05)
+    }
+  }
+  return score
+}
+
+/**
+ * Finds the category closest to a name the user typed. Tolerates case,
+ * accents, typos, and partial names ("grocery" → "Groceries", "dining" →
+ * "Food & Dining"). Returns null when nothing clears the acceptance
+ * threshold — the caller then treats the input as a brand-new category.
+ */
+export function closestCategory(
+  categories: OptionItem[],
+  input: string
+): OptionItem | null {
+  const needle = normalizeName(input)
+  if (!needle) return null
+  const stemmedNeedle = stemName(needle)
+  let best: OptionItem | null = null
+  let bestScore = 0
+  for (const c of categories) {
+    const name = normalizeName(c.name)
+    // Singular/plural variants ("grocery" ↔ "Groceries") should compare as
+    // equals, so score the stemmed forms too and keep the better result.
+    const score = Math.max(
+      nameScore(needle, name),
+      nameScore(stemmedNeedle, stemName(name))
+    )
+    if (score > bestScore) {
+      best = c
+      bestScore = score
+    }
+  }
+  return bestScore >= CLOSEST_CATEGORY_THRESHOLD ? best : null
 }
 
 /**
