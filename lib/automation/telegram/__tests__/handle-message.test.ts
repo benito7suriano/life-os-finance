@@ -316,3 +316,93 @@ describe('buildExtractorInput — documents', () => {
     expect(input).toBeNull()
   })
 })
+
+describe('processIncoming — transfers', () => {
+  const TRANSFER: ExtractedTransaction = {
+    ...EXTRACTED,
+    merchant: null,
+    categoryHint: null,
+    direction: 'transfer',
+    amount: 63806.68,
+    currency: 'DOP',
+    accountHint: 'Cuenta de Ahorros 828289652',
+    toAccountHint: 'Tarjeta de crédito / 4857',
+    toAmount: 1065.22,
+    toCurrency: 'USD',
+    date: '2026-08-22',
+  }
+
+  it('rejects a transfer when the user has fewer than two accounts', async () => {
+    vi.mocked(extractTransaction).mockResolvedValueOnce(TRANSFER)
+    const { supabase, ops } = mockSupabase(respondWith({}))
+
+    await processIncoming(supabase, CHANNEL, 100, {
+      kind: 'text',
+      text: 'pay my visa from savings',
+    })
+
+    expect(vi.mocked(sendMessage).mock.calls[0][1]).toContain('transfer')
+    expect(opsFor(ops, 'pending_telegram_transactions', 'insert')).toHaveLength(0)
+  })
+
+  it('goes straight to the transfer confirm card when both accounts match', async () => {
+    vi.mocked(extractTransaction).mockResolvedValueOnce(TRANSFER)
+    const { supabase, ops } = mockSupabase(
+      respondWith({
+        accounts: [
+          { id: 'a-dop', name: 'Cuenta de Ahorros', last_4_digits: '9652' },
+          { id: 'a-usd', name: 'Visa Infinite', last_4_digits: '4857' },
+        ],
+      })
+    )
+
+    await processIncoming(supabase, CHANNEL, 100, {
+      kind: 'image',
+      bytes: new ArrayBuffer(8),
+      mimeType: 'image/jpeg',
+    })
+
+    const card = vi.mocked(sendMessage).mock.calls[0][1] as string
+    expect(card).toContain('Confirm this transfer')
+    expect(card).toContain('63,806.68 DOP')
+    expect(card).toContain('$1,065.22')
+    expect(card).toContain('From: Cuenta de Ahorros')
+    expect(card).toContain('To:   Visa Infinite')
+
+    const insert = opsFor(ops, 'pending_telegram_transactions', 'insert')[0]
+    const values = insert.values as { status: string; missing_fields: string[] }
+    expect(values.status).toBe('confirming')
+    expect(values.missing_fields).toEqual([])
+  })
+
+  it('asks for the destination account when only the source matches', async () => {
+    vi.mocked(extractTransaction).mockResolvedValueOnce({
+      ...TRANSFER,
+      toAccountHint: null,
+      toAmount: null,
+      toCurrency: null,
+    })
+    const { supabase, ops } = mockSupabase(
+      respondWith({
+        accounts: [
+          { id: 'a-dop', name: 'Cuenta de Ahorros', last_4_digits: '9652' },
+          { id: 'a-usd', name: 'Visa Infinite', last_4_digits: '4857' },
+        ],
+      })
+    )
+
+    await processIncoming(supabase, CHANNEL, 100, {
+      kind: 'text',
+      text: 'moved RD$63,806.68 from savings',
+    })
+
+    const insert = opsFor(ops, 'pending_telegram_transactions', 'insert')[0]
+    const values = insert.values as { status: string; missing_fields: string[] }
+    expect(values.status).toBe('clarifying')
+    expect(values.missing_fields).toEqual(['to_account'])
+
+    // The question card asks for the destination with account buttons.
+    const edit = vi.mocked(editMessageText).mock.calls.at(-1)
+    expect(edit?.[2]).toContain('To which account?')
+  })
+})

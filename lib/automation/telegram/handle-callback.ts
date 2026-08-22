@@ -5,6 +5,7 @@
 //   x:<pendingId>        cancel (any state)
 //   cc:<pendingId>:<i>   category = payload.options.categories[i]
 //   ca:<pendingId>:<i>   account  = payload.options.accounts[i]
+//   ct:<pendingId>:<i>   to_account (transfers) = payload.options.accounts[i]
 //   cd:<pendingId>:t|y   date = today | yesterday
 
 import {
@@ -13,6 +14,7 @@ import {
   type TelegramCallbackQuery,
 } from '@/lib/telegram/client'
 import { applyTransactionBalances } from '@/lib/finance/apply-balances'
+import { fromUsd, toUsd } from '@/lib/fx'
 import { applyAnswer } from './clarification'
 import { formatPendingSummary } from './format'
 import {
@@ -79,8 +81,10 @@ export async function handleCallback(
       return
     }
     case 'cc':
-    case 'ca': {
-      const field = action === 'cc' ? 'category' : 'account'
+    case 'ca':
+    case 'ct': {
+      const field =
+        action === 'cc' ? 'category' : action === 'ca' ? 'account' : 'to_account'
       const options =
         field === 'category'
           ? pending.payload.options?.categories
@@ -96,6 +100,14 @@ export async function handleCallback(
 
       if (!valid) {
         await answerCallbackQuery(cb.id, 'That button is stale — use the latest card.')
+        return
+      }
+      // A transfer's destination can't be its source.
+      if (
+        field === 'to_account' &&
+        options![idx].id === pending.payload.resolved.accountId
+      ) {
+        await answerCallbackQuery(cb.id, "That's the source account — pick a different one.")
         return
       }
       await answerCallbackQuery(cb.id)
@@ -150,16 +162,28 @@ async function confirmPending(
   const resolved = { ...payload.resolved }
   const merchantName = resolved.merchantName ?? extracted.merchant ?? null
 
-  if (!extracted.amount || !resolved.accountId) {
+  if (
+    !extracted.amount ||
+    !resolved.accountId ||
+    (direction === 'transfer' &&
+      (!resolved.toAccountId || resolved.toAccountId === resolved.accountId))
+  ) {
     await editMessageText(
       chatId,
       messageId,
-      '⚠️ Missing required fields (amount or account). Open the app to add an account first.'
+      direction === 'transfer'
+        ? '⚠️ Missing required fields (amount or from/to accounts). A transfer needs two different accounts.'
+        : '⚠️ Missing required fields (amount or account). Open the app to add an account first.'
     )
     await supabase
       .from('pending_telegram_transactions')
       .delete()
       .eq('id', pending.id)
+    return
+  }
+
+  if (direction === 'transfer') {
+    await confirmTransfer(supabase, pending, chatId, messageId)
     return
   }
 
@@ -260,7 +284,146 @@ async function confirmPending(
     balanceWarning = true
   }
 
-  // Update channel stats.
+  await finalizeSaved(supabase, pending, chatId, messageId, {
+    summary: formatPendingSummary(extracted, resolved, { saved: true }),
+    balanceWarning,
+  })
+}
+
+/**
+ * Saves a confirmed transfer: one row with from/to accounts, source-leg amount
+ * in the source account's currency, and a destination leg (to_amount/to_currency)
+ * when the currencies differ. No merchant, no category, no merchant learning.
+ */
+async function confirmTransfer(
+  supabase: FinanceSupabase,
+  pending: PendingRow,
+  chatId: number,
+  messageId: number
+) {
+  const { extracted } = pending.payload
+  const resolved = pending.payload.resolved
+  const fromId = resolved.accountId!
+  const toId = resolved.toAccountId!
+
+  const txDate =
+    extracted.date && /^\d{4}-\d{2}-\d{2}$/.test(extracted.date)
+      ? extracted.date
+      : new Date().toISOString().slice(0, 10)
+
+  // Stamp both legs with the accounts' native currencies (matches the manual
+  // create route); the extractor's guesses are only fallbacks.
+  const accountCurrency = async (id: string): Promise<string | null> => {
+    const { data } = await supabase
+      .from('accounts')
+      .select('currency')
+      .eq('id', id)
+      .maybeSingle()
+    return data?.currency ?? null
+  }
+  const fromCurrency =
+    (await accountCurrency(fromId)) ?? extracted.currency ?? 'USD'
+  const toCurrency =
+    (await accountCurrency(toId)) ??
+    extracted.toCurrency ??
+    extracted.currency ??
+    'USD'
+
+  // The extractor may have assigned the legs backwards (e.g. read the USD
+  // figure as the source when the source account is DOP). If its currencies
+  // are exactly swapped relative to the accounts, swap the amounts back.
+  let amount = extracted.amount!
+  let extractedToAmount = extracted.toAmount ?? null
+  if (
+    extractedToAmount != null &&
+    extracted.currency &&
+    extracted.toCurrency &&
+    extracted.currency !== extracted.toCurrency &&
+    extracted.currency === toCurrency &&
+    extracted.toCurrency === fromCurrency
+  ) {
+    amount = extractedToAmount
+    extractedToAmount = extracted.amount!
+  }
+
+  const insertData: Record<string, unknown> = {
+    user_id: pending.user_id,
+    type: 'transfer',
+    date: txDate,
+    description:
+      extracted.merchant ??
+      (resolved.toAccountName
+        ? `Transfer to ${resolved.toAccountName}`
+        : 'Transfer'),
+    amount,
+    currency: fromCurrency,
+    from_account_id: fromId,
+    to_account_id: toId,
+    source: 'telegram',
+    source_app: 'telegram-bot',
+  }
+
+  // Destination leg for cross-currency transfers: prefer the settled amount
+  // the extractor read off the screen; fall back to the central FX rate.
+  let creditAmount = amount
+  if (toCurrency !== fromCurrency) {
+    creditAmount =
+      extractedToAmount ?? fromUsd(toUsd(amount, fromCurrency), toCurrency)
+    insertData.to_amount = creditAmount
+    insertData.to_currency = toCurrency
+  }
+
+  const { error: txErr } = await supabase
+    .from('transactions')
+    .insert(insertData)
+
+  if (txErr) {
+    console.error('[telegram-webhook] transfer insert failed', txErr)
+    await editMessageText(chatId, messageId, `⚠️ Save failed: ${txErr.message}`)
+    return
+  }
+
+  let balanceWarning = false
+  try {
+    await applyTransactionBalances(
+      supabase,
+      {
+        type: 'transfer',
+        amount,
+        toAmount: creditAmount,
+        fromAccountId: fromId,
+        toAccountId: toId,
+      },
+      1
+    )
+  } catch (balanceErr) {
+    console.error('[telegram-webhook] balance update failed', balanceErr)
+    balanceWarning = true
+  }
+
+  // Saved card reflects what was actually stored (post-swap, account currencies).
+  const savedExtracted = {
+    ...extracted,
+    amount,
+    currency: fromCurrency,
+    toAmount: toCurrency !== fromCurrency ? creditAmount : null,
+    toCurrency: toCurrency !== fromCurrency ? toCurrency : null,
+  }
+
+  await finalizeSaved(supabase, pending, chatId, messageId, {
+    summary: formatPendingSummary(savedExtracted, resolved, { saved: true }),
+    balanceWarning,
+  })
+}
+
+/** Shared confirm tail: channel stats, pending cleanup, and the Saved card. */
+async function finalizeSaved(
+  supabase: FinanceSupabase,
+  pending: PendingRow,
+  chatId: number,
+  messageId: number,
+  opts: { summary: string; balanceWarning: boolean }
+) {
   const { data: ch } = await supabase
     .from('automation_channels')
     .select('id, transactions_logged')
@@ -284,8 +447,8 @@ async function confirmPending(
   await editMessageText(
     chatId,
     messageId,
-    `✅ Saved.\n\n${formatPendingSummary(extracted, resolved, { saved: true })}${
-      balanceWarning
+    `✅ Saved.\n\n${opts.summary}${
+      opts.balanceWarning
         ? "\n\n⚠️ Saved, but the account balance didn't update — check the app."
         : ''
     }`

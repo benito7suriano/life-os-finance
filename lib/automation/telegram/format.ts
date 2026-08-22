@@ -10,7 +10,10 @@ export function formatAmount(
   currency: string | null
 ): string {
   if (amount === null) return '(unknown)'
-  const fixed = amount.toFixed(2)
+  const fixed = amount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
   if (!currency || currency === 'USD') return `$${fixed}`
   return `${fixed} ${currency}`
 }
@@ -19,11 +22,37 @@ export function formatAmount(
  * Renders the transaction summary card. Tolerates legacy payloads that
  * predate merchantName/categoryName (falls back to extracted fields).
  */
+/** "RD$63,806.68 → $1,065.22" for cross-currency transfers; single amount otherwise. */
+export function formatTransferAmounts(extracted: ExtractedTransaction): string {
+  const src = formatAmount(extracted.amount, extracted.currency)
+  if (extracted.toAmount && extracted.toCurrency && extracted.toCurrency !== extracted.currency) {
+    return `${src} → ${formatAmount(extracted.toAmount, extracted.toCurrency)}`
+  }
+  return src
+}
+
 export function formatPendingSummary(
   extracted: ExtractedTransaction,
   resolved: Partial<ResolvedReferences>,
   opts?: { saved?: boolean }
 ): string {
+  if (extracted.direction === 'transfer') {
+    const fromLine =
+      resolved.accountName ?? extracted.accountHint ?? '— (no account!)'
+    const toLine =
+      resolved.toAccountName ?? extracted.toAccountHint ?? '— (no account!)'
+    const lines = [
+      opts?.saved ? '' : '🔁 Confirm this transfer?',
+      '',
+      `Transfer: ${formatTransferAmounts(extracted)}`,
+      `From: ${fromLine}`,
+      `To:   ${toLine}`,
+      `Date: ${extracted.date ?? 'today'}`,
+    ]
+    if (extracted.notes) lines.push(`Notes: ${extracted.notes}`)
+    return lines.join('\n').trim()
+  }
+
   const merchantName = resolved.merchantName ?? extracted.merchant ?? '—'
   const merchantSuffix =
     merchantName !== '—' && !resolved.merchantId ? ' (new)' : ''
@@ -70,6 +99,17 @@ export function formatKnownSoFar(
   extracted: ExtractedTransaction,
   resolved: Partial<ResolvedReferences>
 ): string {
+  if (extracted.direction === 'transfer') {
+    const parts: string[] = []
+    if (extracted.amount) parts.push(formatTransferAmounts(extracted))
+    const fromName = resolved.accountName ?? extracted.accountHint
+    const toName = resolved.toAccountName ?? extracted.toAccountHint
+    if (fromName) parts.push(`from ${fromName}`)
+    if (toName) parts.push(`to ${toName}`)
+    if (extracted.date) parts.push(`on ${extracted.date}`)
+    return parts.length === 0 ? '🔁 New transfer' : `🔁 Transfer ${parts.join(' ')}`
+  }
+
   const parts: string[] = []
   if (extracted.amount) {
     parts.push(formatAmount(extracted.amount, extracted.currency))
@@ -145,8 +185,26 @@ export function buildQuestion(
         text: a.name,
         callback_data: `ca:${pendingId}:${i}`,
       }))
+      const question =
+        extracted.direction === 'transfer'
+          ? '📤 From which account?'
+          : '💳 Which account?'
       return {
-        text: `${header}\n\n💳 Which account?`,
+        text: `${header}\n\n${question}`,
+        keyboard: [...chunk(buttons, 2), cancelRow(pendingId)],
+      }
+    }
+    case 'to_account': {
+      // Same frozen list as 'account' — callback indexes resolve against
+      // payload.options.accounts. The source account stays tappable but is
+      // rejected at confirm time (from ≠ to).
+      const accounts = options.accounts ?? []
+      const buttons = accounts.map((a, i) => ({
+        text: a.name,
+        callback_data: `ct:${pendingId}:${i}`,
+      }))
+      return {
+        text: `${header}\n\n📥 To which account?`,
         keyboard: [...chunk(buttons, 2), cancelRow(pendingId)],
       }
     }
