@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { closestCategory, resolveReferences } from '../resolve-references'
+import {
+  closestCategory,
+  matchAccount,
+  rankAccountOptions,
+  resolveReferences,
+  toThirdPartyExpense,
+} from '../resolve-references'
 import type { ExtractedTransaction } from '../extract-transaction'
 import {
   mockSupabase,
@@ -245,5 +251,119 @@ describe('closestCategory', () => {
 
   it('returns null for empty or whitespace input', () => {
     expect(closestCategory(CATEGORIES, '   ')).toBeNull()
+  })
+})
+
+describe('matchAccount — ledger-style names', () => {
+  // Real-world shape: digits live only in the account NAME, last_4_digits is
+  // null, and the bank screen masks the user's own account number.
+  const LEDGER = [
+    { id: 'pop-dop', name: 'Popular 9652 (DOP)', currency: 'DOP', type: 'checking' },
+    { id: 'pop-usd', name: 'Popular 8471 (USD)', currency: 'USD', type: 'checking' },
+    { id: 'bac-chk', name: 'BAC Checking XXXXX9114', currency: 'USD', type: 'checking' },
+    { id: 'bac-sav', name: 'BAC Savings XXXXX5943', currency: 'USD', type: 'savings' },
+    { id: 'visa-usd', name: 'VISA PLATINUM USD', currency: 'USD', type: 'credit_card' },
+    { id: 'visa-dop', name: 'VISA PLATINUM DOP', currency: 'DOP', type: 'credit_card' },
+    { id: 'wallet-usd', name: 'Wallet (USD)', currency: 'USD', type: 'wallet' },
+    { id: 'wallet-dop', name: 'Wallet (DOP)', currency: 'DOP', type: 'wallet' },
+  ]
+
+  it('matches a masked bank-screen number against digits in the account name', () => {
+    const m = matchAccount(LEDGER, 'Cuenta de ahorros *****9652')
+    expect(m.best?.id).toBe('pop-dop')
+    expect(m.strong).toBe(true)
+  })
+
+  it('treats the tail of an unmasked full account number as weak evidence', () => {
+    const m = matchAccount(LEDGER, 'Cuenta De Ahorros 832238471')
+    expect(m.best?.id).toBe('pop-usd')
+    expect(m.strong).toBe(false)
+  })
+
+  it('matches by masked digits in the ledger name', () => {
+    expect(matchAccount(LEDGER, 'BAC ****9114').best?.id).toBe('bac-chk')
+  })
+
+  it('uses an explicit currency to split twins', () => {
+    expect(matchAccount(LEDGER, 'Visa Platinum RD$').best?.id).toBe('visa-dop')
+    expect(matchAccount(LEDGER, 'wallet usd').best?.id).toBe('wallet-usd')
+  })
+
+  it('refuses to guess between equally likely accounts but suggests both', () => {
+    const m = matchAccount(LEDGER, 'Visa Platinum')
+    expect(m.best).toBeNull()
+    expect(m.suggestions.map(s => s.id).sort()).toEqual(['visa-dop', 'visa-usd'])
+  })
+
+  it('returns nothing for an unrelated hint', () => {
+    const m = matchAccount(LEDGER, 'Apple Pay')
+    expect(m.best).toBeNull()
+    expect(m.suggestions).toEqual([])
+  })
+
+  it('ranks suggestions first for the keyboard and flags them', () => {
+    const m = matchAccount(LEDGER, 'Visa Platinum')
+    const ranked = rankAccountOptions(LEDGER, m.suggestions)
+    expect(ranked[0].suggested).toBe(true)
+    expect(ranked[1].suggested).toBe(true)
+    expect(ranked.slice(2).every(o => !o.suggested)).toBe(true)
+    expect(ranked).toHaveLength(LEDGER.length)
+  })
+})
+
+describe('resolveReferences — third-party payments read as transfers', () => {
+  const LEDGER = [
+    { id: 'pop-dop', name: 'Popular 9652 (DOP)', currency: 'DOP', type: 'checking' },
+    { id: 'pop-usd', name: 'Popular 8471 (USD)', currency: 'USD', type: 'checking' },
+  ]
+  const RENT: ExtractedTransaction = {
+    ...BASE,
+    merchant: null,
+    direction: 'transfer',
+    amount: 89850,
+    currency: 'DOP',
+    accountHint: 'Cuenta de ahorros *****9652',
+    toAccountHint: 'Cuenta De Ahorros 832238471',
+    toAmount: 1500,
+    toCurrency: 'USD',
+    counterparty: 'Hubert Wiriath',
+  }
+
+  it('does not auto-resolve a destination from the tail of an unmasked number', async () => {
+    const { supabase } = mockSupabase(tables({ accounts: LEDGER }))
+    const ctx = await resolveReferences(supabase, 'u1', RENT)
+    expect(ctx.resolved.accountId).toBe('pop-dop')
+    expect(ctx.resolved.toAccountId).toBeNull()
+    expect(ctx.toAccountStrong).toBe(false)
+    // …but still surfaces the lookalike as the first suggestion.
+    expect(ctx.toAccounts[0]).toMatchObject({ id: 'pop-usd', suggested: true })
+  })
+
+  it('still auto-resolves a destination from masked digits', async () => {
+    const { supabase } = mockSupabase(tables({ accounts: LEDGER }))
+    const ctx = await resolveReferences(supabase, 'u1', {
+      ...RENT,
+      toAccountHint: 'Cuenta de ahorros *****8471',
+      counterparty: null,
+    })
+    expect(ctx.resolved.toAccountId).toBe('pop-usd')
+    expect(ctx.toAccountStrong).toBe(true)
+  })
+
+  it('toThirdPartyExpense turns the transfer into an expense paid to the counterparty', () => {
+    const expense = toThirdPartyExpense(RENT)
+    expect(expense.direction).toBe('expense')
+    expect(expense.merchant).toBe('Hubert Wiriath')
+    expect(expense.toAccountHint).toBeNull()
+    expect(expense.accountHint).toBe('Cuenta de ahorros *****9652')
+    expect(expense.notes).toContain('832238471')
+    // Cross-currency legs survive so confirm can pick the account's currency.
+    expect(expense.amount).toBe(89850)
+    expect(expense.toAmount).toBe(1500)
+  })
+
+  it('toThirdPartyExpense falls back to the merchant when no counterparty was named', () => {
+    const expense = toThirdPartyExpense({ ...RENT, counterparty: null, merchant: 'Landlord' })
+    expect(expense.merchant).toBe('Landlord')
   })
 })

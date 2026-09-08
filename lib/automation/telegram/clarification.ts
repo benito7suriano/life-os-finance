@@ -100,10 +100,17 @@ export async function rankCategoriesForKeyboard(
  * Renders the question for the head missing field onto the pending card and
  * freezes the button option list into payload.options when needed.
  */
+/** Button lists for the questions. `toAccounts` falls back to `accounts`. */
+export interface QuestionLists {
+  categories: OptionItem[]
+  accounts: OptionItem[]
+  toAccounts?: OptionItem[]
+}
+
 export async function askNextQuestion(
   supabase: FinanceSupabase,
   pending: PendingRow,
-  lists: { categories: OptionItem[]; accounts: OptionItem[] }
+  lists: QuestionLists
 ): Promise<void> {
   const field = pending.missing_fields[0]
   if (!field) return
@@ -118,8 +125,11 @@ export async function askNextQuestion(
       lists.categories
     )
   }
-  if ((field === 'account' || field === 'to_account') && !options.accounts) {
+  if (field === 'account' && !options.accounts) {
     options.accounts = lists.accounts
+  }
+  if (field === 'to_account' && !options.toAccounts && !options.accounts) {
+    options.toAccounts = lists.toAccounts ?? lists.accounts
   }
 
   const newPayload: PendingPayload = { ...payload, options }
@@ -165,14 +175,18 @@ export async function applyAnswer(
   const payload = pending.payload
   let extracted = payload.extracted
   let resolved = payload.resolved
-  let lists: { categories: OptionItem[]; accounts: OptionItem[] } | null = null
+  let lists: QuestionLists | null = null
 
   if (answer.kind === 'extracted') {
     extracted = answer.extracted
     // Re-resolve: a new merchant name may match now, category may resolve via
     // merchant default. Preserve any prior explicit user choices.
     const ctx = await resolveReferences(supabase, pending.user_id, extracted)
-    lists = { categories: ctx.categories, accounts: ctx.accounts }
+    lists = {
+      categories: ctx.categories,
+      accounts: ctx.accounts,
+      toAccounts: ctx.toAccounts,
+    }
     const fresh = ctx.resolved
     if (resolved.categorySource === 'user_choice' && resolved.categoryId) {
       fresh.categoryId = resolved.categoryId
@@ -277,7 +291,7 @@ export async function applyAnswer(
       pending.telegram_chat_id,
       pending.telegram_message_id,
       formatPendingSummary(extracted, resolved),
-      { keyboard: confirmKeyboard(pending.id) }
+      { keyboard: confirmKeyboard(pending.id, extracted.direction) }
     )
   } else {
     if (!lists) {
@@ -288,10 +302,15 @@ export async function applyAnswer(
       const options = newPayload.options ?? {}
       const needsLists =
         (next === 'category' && !options.categories) ||
-        ((next === 'account' || next === 'to_account') && !options.accounts)
+        (next === 'account' && !options.accounts) ||
+        (next === 'to_account' && !options.toAccounts && !options.accounts)
       if (needsLists) {
         const ctx = await resolveReferences(supabase, pending.user_id, extracted)
-        lists = { categories: ctx.categories, accounts: ctx.accounts }
+        lists = {
+          categories: ctx.categories,
+          accounts: ctx.accounts,
+          toAccounts: ctx.toAccounts,
+        }
       } else {
         lists = { categories: [], accounts: [] }
       }

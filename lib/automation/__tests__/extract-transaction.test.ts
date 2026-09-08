@@ -271,3 +271,73 @@ describe('extractTransaction — transfers', () => {
     expect(result.toCurrency).toBeNull()
   })
 })
+
+describe('extractTransaction — third-party payments', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    process.env.GEMINI_API_KEY = 'test-key'
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('coerces counterparty and teaches the own-vs-third-party rule', async () => {
+    fetchMock.mockResolvedValueOnce(
+      geminiOk({
+        ...SAMPLE,
+        merchant: 'Hubert Wiriath',
+        counterparty: '  Hubert Wiriath ',
+        categoryHint: 'Rent',
+        direction: 'expense',
+        accountHint: 'Cuenta de ahorros *****9652',
+      })
+    )
+
+    const result = await extractTransaction({ kind: 'text', text: 'rent' })
+    expect(result.counterparty).toBe('Hubert Wiriath')
+    expect(result.direction).toBe('expense')
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    expect(body.generation_config.response_schema.properties.counterparty).toBeDefined()
+    expect(body.system_instruction.parts[0].text).toContain('Beneficiario')
+    expect(body.system_instruction.parts[0].text).toContain('BOTH accounts belong to the user')
+  })
+
+  it('nulls a blank counterparty', async () => {
+    fetchMock.mockResolvedValueOnce(geminiOk({ ...SAMPLE, counterparty: '   ' }))
+    const result = await extractTransaction({ kind: 'text', text: 'coffee 3.75' })
+    expect(result.counterparty).toBeNull()
+  })
+
+  it('lists the user accounts in the message when given context', async () => {
+    fetchMock.mockResolvedValueOnce(geminiOk(SAMPLE))
+    await extractTransaction(
+      { kind: 'image', bytes: new ArrayBuffer(8), mimeType: 'image/jpeg' },
+      {
+        accounts: [
+          { name: 'Popular 9652 (DOP)', type: 'checking', currency: 'DOP' },
+          { name: 'Cash USD' },
+        ],
+      }
+    )
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    const text = body.contents[0].parts[0].text as string
+    expect(text).toContain("The user's own accounts")
+    expect(text).toContain('- Popular 9652 (DOP) (checking, DOP)')
+    expect(text).toContain('- Cash USD')
+    expect(text).toContain('Today is')
+  })
+
+  it('omits the preamble without context', async () => {
+    fetchMock.mockResolvedValueOnce(geminiOk(SAMPLE))
+    await extractTransaction({ kind: 'text', text: 'coffee 3.75' })
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    expect(body.contents[0].parts[0].text).not.toContain("The user's own accounts")
+  })
+})

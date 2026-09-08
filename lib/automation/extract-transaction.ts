@@ -34,6 +34,18 @@ export interface ExtractedTransaction {
   toAmount?: number | null
   /** Transfers only: ISO currency of `toAmount`. */
   toCurrency?: string | null
+  /** Payments to somebody else (rent, a person, a business) made by bank
+   * transfer: the payee's name as shown on the screen. Null for transfers
+   * between the user's own accounts and for ordinary receipts. */
+  counterparty?: string | null
+}
+
+/** Optional ledger context that sharpens extraction. */
+export interface ExtractorContext {
+  /** The user's own accounts, so the model can (a) name the exact account a
+   * screen refers to and (b) tell own-account transfers from payments to
+   * third parties. */
+  accounts?: Array<{ name: string; type?: string | null; currency?: string | null }>
 }
 
 export type ExtractorInput =
@@ -57,6 +69,7 @@ Fields:
 - direction: "expense" unless clearly income or a transfer between the user's own accounts.
 - confidence: 0-1, your confidence in amount + merchant.
 - toAccountHint / toAmount / toCurrency: transfers only (see transfer rules). Null otherwise.
+- counterparty: for a bank transfer that PAYS somebody else (a person, a landlord, a business), the payee's name as shown ("Beneficiario", "A nombre de", "Para", "Destinatario"). Null for transfers between the user's own accounts and for ordinary receipts.
 
 Rules:
 - Receipts may be in ANY language, commonly Spanish (El Salvador / Latin America). The amount is the grand total: labels like TOTAL, VENTA TOTAL, TOTAL A PAGAR, GRAN TOTAL. NEVER use SUB-TOTAL/SUBTOTAL, IVA (tax), or PROPINA (tip) as the amount. If both a subtotal and a total appear, use the total.
@@ -70,6 +83,10 @@ Transfer rules:
 - amount = what leaves the source account, in the source account's currency. toAmount/toCurrency = what arrives at the destination, when the two currencies differ; null for same-currency transfers.
 - Bank apps often show both currencies with a "Tasa de cambio"/exchange-rate line (e.g. US$1,065.22 and RD$63,806.68 at RD$59.90/US$1.00). Use the rate line and account labels to assign each amount to the correct leg: a Dominican savings account ("Cuenta de Ahorros", RD$) is the DOP leg; a USD card is the USD leg. If unsure which leg is the source, still return both amounts — pick the more likely assignment and lower confidence.
 - Transfers usually have no merchant or category — return null for both.
+Own accounts vs. payments to others:
+- direction="transfer" ONLY when BOTH accounts belong to the user. Signals that the destination is the user's own: it is masked like the source (*****1234), it is one of the user's listed accounts/cards, or the screen says "entre mis cuentas" / "mis productos" / "own accounts".
+- A bank transfer to somebody ELSE is an EXPENSE, not a transfer: a beneficiary name that is a person or business ("Beneficiario: Hubert Wiriath", "Pago a terceros", "Transferencia a terceros", "Pago de servicios"), or a destination shown as a full unmasked account number belonging to another person. Then: direction="expense", merchant = the payee name (null if none shown), counterparty = the same name, accountHint = the SOURCE account, toAccountHint = null, categoryHint from context ("Rent" for a landlord / "renta" / "alquiler", "Utilities" for a service company), and put the destination account number in notes. Keep toAmount/toCurrency when the screen shows a second currency for what the payee receives.
+- If the user's accounts are listed in the message: when the screen clearly refers to one of them (matching masked digits, card name, or currency), set accountHint/toAccountHint to that EXACT listed name. When the destination matches none of them and no beneficiary is named, keep the raw destination text as toAccountHint and lower confidence.
 - Thermal receipts are often low-contrast, skewed, or partly cut off — read carefully. Prefer returning partial fields (amount only, merchant only) over failing. Only return null amount if no plausible total is visible.
 - Never invent merchants — return null if unclear.`
 
@@ -89,6 +106,7 @@ const EXTRACTED_SCHEMA = {
     toAccountHint: { type: 'STRING', nullable: true },
     toAmount: { type: 'NUMBER', nullable: true },
     toCurrency: { type: 'STRING', nullable: true },
+    counterparty: { type: 'STRING', nullable: true },
   },
   required: ['direction', 'confidence', 'dateAmbiguous'],
 }
@@ -136,16 +154,36 @@ function bytesToBase64(bytes: ArrayBuffer): string {
   return buf.toString('base64')
 }
 
-function buildUserContent(input: ExtractorInput, today: string): GeminiContent {
+/** "The user's own accounts: …" preamble, or '' when no context was given. */
+function accountsPreamble(context: ExtractorContext): string {
+  const accounts = context.accounts ?? []
+  if (accounts.length === 0) return ''
+  const lines = accounts.map(a => {
+    const meta = [a.type, a.currency].filter(Boolean).join(', ')
+    return meta ? `- ${a.name} (${meta})` : `- ${a.name}`
+  })
+  return (
+    "The user's own accounts (name, type, currency) — a destination that is none of these is a payment to somebody else:\n" +
+    lines.join('\n') +
+    '\n\n'
+  )
+}
+
+function buildUserContent(
+  input: ExtractorInput,
+  today: string,
+  context: ExtractorContext = {}
+): GeminiContent {
   const parts: GeminiPart[] = []
+  const preamble = accountsPreamble(context)
 
   if (input.kind === 'text') {
     parts.push({
-      text: `Today is ${today}. Extract the transaction from this message:\n\n${input.text}`,
+      text: `${preamble}Today is ${today}. Extract the transaction from this message:\n\n${input.text}`,
     })
   } else if (input.kind === 'audio') {
     parts.push({
-      text: `Today is ${today}. The user sent a voice note describing a transaction. Transcribe and extract.`,
+      text: `${preamble}Today is ${today}. The user sent a voice note describing a transaction. Transcribe and extract.`,
     })
     parts.push({
       inline_data: {
@@ -157,7 +195,7 @@ function buildUserContent(input: ExtractorInput, today: string): GeminiContent {
     const medium = input.kind === 'pdf' ? 'receipt or statement PDF' : 'receipt photo'
     parts.push({
       text:
-        `Today is ${today}. The user sent a ${medium}` +
+        `${preamble}Today is ${today}. The user sent a ${medium}` +
         (input.caption ? ` with caption: "${input.caption}".` : '.') +
         ' Extract the transaction.',
     })
@@ -294,17 +332,22 @@ function coerceExtracted(parsed: Partial<ExtractedTransaction>): ExtractedTransa
         ? parsed.toAmount
         : null,
     toCurrency: typeof parsed.toCurrency === 'string' ? parsed.toCurrency : null,
+    counterparty:
+      typeof parsed.counterparty === 'string' && parsed.counterparty.trim()
+        ? parsed.counterparty.trim()
+        : null,
   }
 }
 
 export async function extractTransaction(
-  input: ExtractorInput
+  input: ExtractorInput,
+  context: ExtractorContext = {}
 ): Promise<ExtractedTransaction> {
   const today = new Date().toISOString().slice(0, 10)
 
   const body = {
     system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    contents: [buildUserContent(input, today)],
+    contents: [buildUserContent(input, today, context)],
     generation_config: {
       response_mime_type: 'application/json',
       response_schema: EXTRACTED_SCHEMA,

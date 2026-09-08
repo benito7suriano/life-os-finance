@@ -512,3 +512,168 @@ describe('processIncoming — transfers', () => {
     expect(edit?.[2]).toContain('To which account?')
   })
 })
+
+describe('processIncoming — account pre-selection', () => {
+  const LEDGER = [
+    { id: 'pop-dop', name: 'Popular 9652 (DOP)', currency: 'DOP', type: 'checking' },
+    { id: 'pop-usd', name: 'Popular 8471 (USD)', currency: 'USD', type: 'checking' },
+    { id: 'visa-usd', name: 'VISA PLATINUM USD', currency: 'USD', type: 'credit_card' },
+    { id: 'visa-dop', name: 'VISA PLATINUM DOP', currency: 'DOP', type: 'credit_card' },
+  ]
+  const OWN_TRANSFER: ExtractedTransaction = {
+    ...EXTRACTED,
+    merchant: null,
+    categoryHint: null,
+    direction: 'transfer',
+    amount: 63806.68,
+    currency: 'DOP',
+    accountHint: 'Cuenta de ahorros *****9652',
+    toAccountHint: 'Tarjeta de crédito *****8471',
+    toAmount: 1065.22,
+    toCurrency: 'USD',
+    date: '2026-08-22',
+  }
+
+  it('hands the extractor the account list for context', async () => {
+    vi.mocked(extractTransaction).mockResolvedValueOnce(OWN_TRANSFER)
+    const { supabase } = mockSupabase(respondWith({ accounts: LEDGER }))
+
+    await processIncoming(supabase, CHANNEL, 100, { kind: 'text', text: 'x' })
+
+    const ctx = vi.mocked(extractTransaction).mock.calls[0][1]
+    expect(ctx?.accounts?.map(a => a.name)).toEqual(LEDGER.map(a => a.name))
+  })
+
+  it('pre-selects both accounts from masked digits in the ledger names and offers edit buttons', async () => {
+    vi.mocked(extractTransaction).mockResolvedValueOnce(OWN_TRANSFER)
+    const { supabase, ops } = mockSupabase(respondWith({ accounts: LEDGER }))
+
+    await processIncoming(supabase, CHANNEL, 100, {
+      kind: 'image',
+      bytes: new ArrayBuffer(8),
+      mimeType: 'image/jpeg',
+    })
+
+    const card = vi.mocked(sendMessage).mock.calls[0][1] as string
+    expect(card).toContain('From: Popular 9652 (DOP)')
+    expect(card).toContain('To:   Popular 8471 (USD)')
+    const insert = opsFor(ops, 'pending_telegram_transactions', 'insert')[0]
+    expect(insert.values).toMatchObject({ status: 'confirming', missing_fields: [] })
+
+    const keyboard = vi.mocked(editMessageText).mock.calls[0][3]!.keyboard!
+    expect(keyboard[0][0].callback_data).toBe('c:p-new')
+    expect(keyboard[1]).toEqual([
+      { text: '✏️ From account', callback_data: 'ea:p-new' },
+      { text: '✏️ To account', callback_data: 'et:p-new' },
+    ])
+  })
+
+  it('asks for an ambiguous destination with the best guesses starred first and a "not my account" escape', async () => {
+    vi.mocked(extractTransaction).mockResolvedValueOnce({
+      ...OWN_TRANSFER,
+      toAccountHint: 'Visa Platinum',
+    })
+    const { supabase, ops } = mockSupabase(respondWith({ accounts: LEDGER }))
+
+    await processIncoming(supabase, CHANNEL, 100, { kind: 'text', text: 'x' })
+
+    const insert = opsFor(ops, 'pending_telegram_transactions', 'insert')[0]
+    expect(insert.values).toMatchObject({ status: 'clarifying', missing_fields: ['to_account'] })
+
+    const [, , text, opts] = vi.mocked(editMessageText).mock.calls.at(-1)!
+    expect(text).toContain('To which account?')
+    expect(text).toContain('⭐ = my best guess')
+    const keyboard = opts!.keyboard!
+    expect(keyboard[0][0].text).toBe('⭐ VISA PLATINUM USD')
+    expect(keyboard[0][1].text).toBe('⭐ VISA PLATINUM DOP')
+    expect(keyboard.at(-2)![0]).toEqual({
+      text: "🙅 Not my account — it's a payment",
+      callback_data: 'cp:p-new',
+    })
+    // Destination list frozen separately from the source list.
+    const update = opsFor(ops, 'pending_telegram_transactions', 'update')[0]
+    const payload = update.values as { payload: { options: { toAccounts: unknown[] } } }
+    expect(payload.payload.options.toAccounts).toHaveLength(LEDGER.length)
+  })
+})
+
+describe('processIncoming — payments to somebody else', () => {
+  const LEDGER = [
+    { id: 'pop-dop', name: 'Popular 9652 (DOP)', currency: 'DOP', type: 'checking' },
+    { id: 'pop-usd', name: 'Popular 8471 (USD)', currency: 'USD', type: 'checking' },
+  ]
+  const RENT_AS_TRANSFER: ExtractedTransaction = {
+    ...EXTRACTED,
+    merchant: null,
+    categoryHint: 'Rent',
+    direction: 'transfer',
+    amount: 89850,
+    currency: 'DOP',
+    accountHint: 'Cuenta de ahorros *****9652',
+    toAccountHint: 'Cuenta De Ahorros 832238471',
+    toAmount: 1500,
+    toCurrency: 'USD',
+    counterparty: 'Hubert Wiriath',
+    date: '2026-09-08',
+  }
+
+  it('re-frames a transfer to a named payee as an expense from the source account', async () => {
+    vi.mocked(extractTransaction).mockResolvedValueOnce(RENT_AS_TRANSFER)
+    const { supabase, ops } = mockSupabase(
+      respondWith({
+        accounts: LEDGER,
+        categories: [{ id: 'c-rent', name: 'Rent', type: 'expense' }],
+      })
+    )
+
+    await processIncoming(supabase, CHANNEL, 100, {
+      kind: 'image',
+      bytes: new ArrayBuffer(8),
+      mimeType: 'image/jpeg',
+    })
+
+    // Categories were re-fetched for the new direction.
+    const categoryOps = opsFor(ops, 'categories', 'select')
+    expect(categoryOps.map(o => o.filters.eq?.find(a => a[0] === 'type')?.[1])).toEqual([
+      'transfer',
+      'expense',
+    ])
+
+    const card = vi.mocked(sendMessage).mock.calls[0][1] as string
+    expect(card).toContain('Confirm this transaction?')
+    expect(card).toContain('Expense: 89,850.00 DOP (= $1,500.00)')
+    expect(card).toContain('Merchant: Hubert Wiriath (new)')
+    expect(card).toContain('Category: Rent')
+    expect(card).toContain('Account:  Popular 9652 (DOP)')
+    expect(card).toContain('832238471')
+
+    const insert = opsFor(ops, 'pending_telegram_transactions', 'insert')[0]
+    const values = insert.values as {
+      status: string
+      payload: { direction: string; extracted: ExtractedTransaction }
+    }
+    expect(values.status).toBe('confirming')
+    expect(values.payload.direction).toBe('expense')
+    expect(values.payload.extracted.toAccountHint).toBeNull()
+
+    const keyboard = vi.mocked(editMessageText).mock.calls[0][3]!.keyboard!
+    expect(keyboard[1]).toEqual([{ text: '✏️ Change account', callback_data: 'ea:p-new' }])
+  })
+
+  it('keeps a transfer whose destination is unmistakably the user\'s own account', async () => {
+    vi.mocked(extractTransaction).mockResolvedValueOnce({
+      ...RENT_AS_TRANSFER,
+      toAccountHint: 'Cuenta de ahorros *****8471',
+      counterparty: 'Beno Suriano',
+    })
+    const { supabase, ops } = mockSupabase(respondWith({ accounts: LEDGER }))
+
+    await processIncoming(supabase, CHANNEL, 100, { kind: 'text', text: 'x' })
+
+    const insert = opsFor(ops, 'pending_telegram_transactions', 'insert')[0]
+    expect(insert.values).toMatchObject({
+      status: 'confirming',
+      payload: { direction: 'transfer' },
+    })
+  })
+})
