@@ -112,7 +112,6 @@ describe('TOOL_DEFINITIONS', () => {
   it('are strict, closed schemas whose descriptions say when to call them', () => {
     expect(TOOL_DEFINITIONS.length).toBeGreaterThanOrEqual(9)
     for (const tool of TOOL_DEFINITIONS) {
-      expect(tool.strict, tool.name).toBe(true)
       expect(tool.input_schema.additionalProperties, tool.name).toBe(false)
       expect(tool.description ?? '', tool.name).toMatch(/(Call|Use) this when/)
     }

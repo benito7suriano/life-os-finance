@@ -2,14 +2,14 @@
 // tools, with per-chat memory of prior text turns. Tool calls and results are
 // not persisted — every question re-fetches fresh data.
 
-import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { AGENT_MODEL, FALLBACK_BETAS, getAgentClient, type AgentClient } from './client'
-import { buildSystemBlocks } from './system-prompt'
+import { getAgentClient } from './client'
+import { buildSystemPrompt } from './system-prompt'
 import { TOOL_DEFINITIONS, executeTool, type ToolContext } from './tools'
+import type { AgentClient, AssistantBlock, Message, ToolResultBlock } from './types'
 import { reportTimezone } from '@/lib/reports/schedule'
 
-export type { AgentClient } from './client'
+export type { AgentClient } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FinanceSupabase = SupabaseClient<any, any, any>
@@ -30,7 +30,7 @@ export interface RunAgentInput {
   question: string
   now?: Date
   timeZone?: string
-  /** Injected in tests; defaults to the real Anthropic client. */
+  /** Injected in tests; defaults to the real model client. */
   client?: AgentClient
   logTransaction?: ToolContext['logTransaction']
 }
@@ -52,45 +52,38 @@ export async function runWealthAgent(input: RunAgentInput): Promise<RunAgentResu
   }
 
   const history = await loadHistory(input.supabase, input.chatId)
-  const messages: Anthropic.Beta.BetaMessageParam[] = [
-    ...history,
-    { role: 'user', content: input.question },
-  ]
+  const messages: Message[] = [...history, { role: 'user', content: input.question }]
+  const system = buildSystemPrompt(now, input.timeZone ?? reportTimezone())
 
   let loggedTransaction = false
   let reply: string | null = null
 
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
     const response = await client.createMessage({
-      model: AGENT_MODEL,
-      max_tokens: MAX_TOKENS,
-      output_config: { effort: 'low' },
-      betas: [...FALLBACK_BETAS],
-      fallbacks: 'default',
-      system: buildSystemBlocks(now, input.timeZone ?? reportTimezone()),
-      tools: TOOL_DEFINITIONS,
+      system,
       messages,
+      tools: TOOL_DEFINITIONS,
+      maxTokens: MAX_TOKENS,
+      effort: 'low',
     })
 
-    if (response.stop_reason === 'refusal') {
+    if (response.stopReason === 'refusal') {
       reply = REFUSAL_REPLY
       break
     }
 
-    const toolUses = response.content.filter(
-      (b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use'
-    )
-    if (response.stop_reason !== 'tool_use' || toolUses.length === 0) {
+    const toolUses = response.content.filter((b) => b.type === 'tool_use')
+    if (response.stopReason !== 'tool_use' || toolUses.length === 0) {
       reply = textOf(response.content) || EMPTY_REPLY
       break
     }
 
-    messages.push({ role: 'assistant', content: response.content })
+    messages.push({ role: 'assistant', content: response.content, raw: response.raw })
 
     // Run every requested tool concurrently and return ALL results in one
     // user turn — splitting them teaches the model to stop parallelising.
     const results = await Promise.all(
-      toolUses.map(async (tu): Promise<Anthropic.Beta.BetaToolResultBlockParam> => {
+      toolUses.map(async (tu): Promise<ToolResultBlock> => {
         try {
           const output = await executeTool(tu.name, tu.input, ctx)
           if (tu.name === 'log_transaction') loggedTransaction = true
@@ -114,18 +107,15 @@ export async function runWealthAgent(input: RunAgentInput): Promise<RunAgentResu
   return { reply, loggedTransaction }
 }
 
-function textOf(content: Anthropic.Beta.BetaContentBlock[]): string {
+function textOf(content: AssistantBlock[]): string {
   return content
-    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
+    .filter((b): b is Extract<AssistantBlock, { type: 'text' }> => b.type === 'text')
     .map((b) => b.text)
     .join('\n')
     .trim()
 }
 
-async function loadHistory(
-  supabase: FinanceSupabase,
-  chatId: number
-): Promise<Anthropic.Beta.BetaMessageParam[]> {
+async function loadHistory(supabase: FinanceSupabase, chatId: number): Promise<Message[]> {
   const { data, error } = await supabase
     .from('telegram_agent_messages')
     .select('role, content')
@@ -137,10 +127,14 @@ async function loadHistory(
     return []
   }
   const rows = ((data ?? []) as { role: 'user' | 'assistant'; content: string }[]).reverse()
-  // The API requires the first message to be a user turn.
+  // Conversations must start with a user turn.
   const firstUser = rows.findIndex((r) => r.role === 'user')
   if (firstUser < 0) return []
-  return rows.slice(firstUser).map((r) => ({ role: r.role, content: r.content }))
+  return rows.slice(firstUser).map((r): Message =>
+    r.role === 'user'
+      ? { role: 'user', content: r.content }
+      : { role: 'assistant', content: [{ type: 'text', text: r.content }] }
+  )
 }
 
 async function persistTurn(input: RunAgentInput, reply: string): Promise<void> {

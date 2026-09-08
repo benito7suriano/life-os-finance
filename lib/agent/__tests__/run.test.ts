@@ -1,42 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type Anthropic from '@anthropic-ai/sdk'
 import { mockSupabase, opsFor, filterArg } from '@/lib/test-utils/mock-supabase'
-import { runWealthAgent, MAX_TOOL_ITERATIONS, type AgentClient } from '../run'
-
-type Params = Anthropic.Beta.MessageCreateParamsNonStreaming
-type Msg = Anthropic.Beta.BetaMessage
+import { runWealthAgent, MAX_TOOL_ITERATIONS } from '../run'
+import type { AgentClient, ModelRequest, ModelResponse } from '../types'
 
 const NOW = new Date(2026, 8, 15)
 
-function textMessage(text: string, overrides: Partial<Msg> = {}): Msg {
+function textResponse(text: string): ModelResponse {
+  return { content: text ? [{ type: 'text', text }] : [], stopReason: 'end_turn' }
+}
+
+function toolUseResponse(calls: { id: string; name: string; input: Record<string, unknown> }[]): ModelResponse {
   return {
-    id: 'msg_1',
-    type: 'message',
-    role: 'assistant',
-    model: 'claude-opus-5',
-    content: [{ type: 'text', text, citations: null }],
-    stop_reason: 'end_turn',
-    stop_sequence: null,
-    usage: { input_tokens: 1, output_tokens: 1 } as Msg['usage'],
-    ...overrides,
-  } as Msg
+    content: calls.map((c) => ({ type: 'tool_use', id: c.id, name: c.name, input: c.input })),
+    stopReason: 'tool_use',
+    raw: [{ marker: 'provider-parts' }],
+  }
 }
 
-function toolUseMessage(calls: { id: string; name: string; input: unknown }[]): Msg {
-  return textMessage('', {
-    content: calls.map((c) => ({ type: 'tool_use', id: c.id, name: c.name, input: c.input })) as Msg['content'],
-    stop_reason: 'tool_use',
-  })
-}
-
-/** Scripted fake client: returns the queued messages in order, records params. */
-function fakeClient(script: Msg[]): AgentClient & { calls: Params[] } {
-  const calls: Params[] = []
+/** Scripted fake client: returns the queued responses in order, records requests. */
+function fakeClient(script: ModelResponse[]): AgentClient & { calls: ModelRequest[] } {
+  const calls: ModelRequest[] = []
   const queue = [...script]
   return {
     calls,
-    async createMessage(params) {
-      calls.push(params)
+    async createMessage(request) {
+      calls.push(request)
       const next = queue.shift()
       if (!next) throw new Error('fake client: script exhausted')
       return next
@@ -62,8 +50,8 @@ beforeEach(() => {
 })
 
 describe('runWealthAgent', () => {
-  it('sends a cached static system prompt, the tool set, prior turns and the question', async () => {
-    const client = fakeClient([textMessage('Your net worth is $500.')])
+  it('sends the system prompt with the date, the tool set, prior turns and the question at low effort', async () => {
+    const client = fakeClient([textResponse('Your net worth is $500.')])
     const { supabase } = db([
       { role: 'user', content: 'hi' },
       { role: 'assistant', content: 'hello' },
@@ -72,33 +60,26 @@ describe('runWealthAgent', () => {
     const result = await runWealthAgent({ supabase, userId: 'u1', chatId: 100, question: 'net worth?', now: NOW, client })
 
     expect(result).toEqual({ reply: 'Your net worth is $500.', loggedTransaction: false })
-    const [params] = client.calls
-    expect(params.model).toBe('claude-opus-5')
-    expect(params.max_tokens).toBe(4096)
-    expect(params.output_config).toEqual({ effort: 'low' })
-    expect(params.betas).toContain('server-side-fallback-2026-07-01')
-    expect(params.fallbacks).toBe('default')
-    expect(params.tools?.map((t) => (t as { name: string }).name)).toContain('get_accounts')
-
-    const system = params.system as Anthropic.Beta.BetaTextBlockParam[]
-    expect(system[0].cache_control).toEqual({ type: 'ephemeral' })
-    expect(system[1].text).toContain('2026-09-15')
-    expect(system[0].text).not.toContain('2026-09-15')
-
-    expect(params.messages).toEqual([
+    const [request] = client.calls
+    expect(request.maxTokens).toBe(4096)
+    expect(request.effort).toBe('low')
+    expect(request.tools?.map((t) => t.name)).toContain('get_accounts')
+    // Static prompt first (cache-friendly), today's date at the end.
+    expect(request.system.indexOf('personal wealth manager')).toBeLessThan(request.system.indexOf('2026-09-15'))
+    expect(request.messages).toEqual([
       { role: 'user', content: 'hi' },
-      { role: 'assistant', content: 'hello' },
+      { role: 'assistant', content: [{ type: 'text', text: 'hello' }] },
       { role: 'user', content: 'net worth?' },
     ])
   })
 
   it('executes tool calls, returns all results in one user message, and loops until text', async () => {
     const client = fakeClient([
-      toolUseMessage([
+      toolUseResponse([
         { id: 'tu_1', name: 'get_accounts', input: {} },
         { id: 'tu_2', name: 'no_such_tool', input: {} },
       ]),
-      textMessage('You have $500 in Checking.'),
+      textResponse('You have $500 in Checking.'),
     ])
     const { supabase } = db()
 
@@ -107,18 +88,18 @@ describe('runWealthAgent', () => {
     expect(result.reply).toBe('You have $500 in Checking.')
     expect(client.calls).toHaveLength(2)
     const second = client.calls[1].messages
-    expect(second[1].role).toBe('assistant')
-    const toolResults = second[2].content as Anthropic.Beta.BetaToolResultBlockParam[]
+    expect(second[1]).toMatchObject({ role: 'assistant', raw: [{ marker: 'provider-parts' }] })
     expect(second[2].role).toBe('user')
+    const toolResults = second[2].content as { tool_use_id: string; is_error?: boolean; content: string }[]
     expect(toolResults.map((r) => [r.tool_use_id, r.is_error ?? false])).toEqual([
       ['tu_1', false],
       ['tu_2', true],
     ])
-    expect(JSON.parse(toolResults[0].content as string).accounts[0].name).toBe('Checking')
+    expect(JSON.parse(toolResults[0].content).accounts[0].name).toBe('Checking')
   })
 
   it('persists the question and the final answer, then prunes old turns', async () => {
-    const client = fakeClient([textMessage('answer')])
+    const client = fakeClient([textResponse('answer')])
     const { supabase, ops } = db()
 
     await runWealthAgent({ supabase, userId: 'u1', chatId: 100, question: 'q', now: NOW, client })
@@ -135,8 +116,8 @@ describe('runWealthAgent', () => {
 
   it('suppresses its own reply when the transaction pipeline sent a card', async () => {
     const client = fakeClient([
-      toolUseMessage([{ id: 'tu_1', name: 'log_transaction', input: { text: '$12 coffee' } }]),
-      textMessage('Sent you a confirmation card.'),
+      toolUseResponse([{ id: 'tu_1', name: 'log_transaction', input: { text: '$12 coffee' } }]),
+      textResponse('Sent you a confirmation card.'),
     ])
     const logTransaction = vi.fn(async () => {})
     const { supabase } = db()
@@ -149,7 +130,7 @@ describe('runWealthAgent', () => {
 
   it('stops after the iteration cap instead of looping forever', async () => {
     const script = Array.from({ length: MAX_TOOL_ITERATIONS + 2 }, () =>
-      toolUseMessage([{ id: 'tu', name: 'get_accounts', input: {} }])
+      toolUseResponse([{ id: 'tu', name: 'get_accounts', input: {} }])
     )
     const client = fakeClient(script)
     const { supabase } = db()
@@ -161,7 +142,7 @@ describe('runWealthAgent', () => {
   })
 
   it('returns a plain apology on a refusal instead of reading empty content', async () => {
-    const client = fakeClient([textMessage('', { content: [], stop_reason: 'refusal' })])
+    const client = fakeClient([{ content: [], stopReason: 'refusal' }])
     const { supabase } = db()
 
     const result = await runWealthAgent({ supabase, userId: 'u1', chatId: 100, question: 'x', now: NOW, client })

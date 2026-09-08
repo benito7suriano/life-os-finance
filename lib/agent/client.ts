@@ -1,36 +1,30 @@
-// Anthropic client for the wealth-manager agent and report phrasing.
-// Wrapped behind a tiny interface so the tool loop is unit-testable with a
-// scripted fake instead of the SDK.
+// Model client for the wealth-manager agent and report phrasing. Gemini 3.8
+// Flash, reusing the GEMINI_API_KEY that already powers receipt extraction.
+// The tool loop only depends on the AgentClient interface, so tests inject a
+// scripted fake and a provider swap touches this file + one adapter.
 
-import Anthropic from '@anthropic-ai/sdk'
+import { createGeminiClient } from './gemini'
+import type { AgentClient } from './types'
 
-export const AGENT_MODEL = 'claude-opus-5'
+export type { AgentClient } from './types'
 
-/** Server-side refusal fallback: a safety-classifier decline is transparently
- * re-run on Anthropic's recommended fallback model. Delete these two fields
- * from every request if you'd rather see refusals directly. */
-export const FALLBACK_BETAS = ['server-side-fallback-2026-07-01'] as const
+export const DEFAULT_AGENT_MODEL = 'gemini-3.8-flash'
 
-export interface AgentClient {
-  createMessage(
-    params: Anthropic.Beta.MessageCreateParamsNonStreaming
-  ): Promise<Anthropic.Beta.BetaMessage>
+/** Override with GEMINI_AGENT_MODEL to swap models without a deploy. */
+export function agentModel(): string {
+  return process.env.GEMINI_AGENT_MODEL || DEFAULT_AGENT_MODEL
 }
 
-export function hasAnthropicKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
+export function hasAgentKey(): boolean {
+  return Boolean(process.env.GEMINI_API_KEY)
 }
 
 let cached: AgentClient | null = null
 
 export function getAgentClient(): AgentClient {
   if (cached) return cached
-  if (!hasAnthropicKey()) {
-    throw new Error('ANTHROPIC_API_KEY is not set')
-  }
-  const anthropic = new Anthropic()
-  cached = {
-    createMessage: (params) => anthropic.beta.messages.create(params),
-  }
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
+  cached = createGeminiClient(apiKey, agentModel())
   return cached
 }

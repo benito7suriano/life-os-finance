@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type Anthropic from '@anthropic-ai/sdk'
 import { generateReport } from '../generate'
 import type { WeeklyReportData } from '../build'
-import type { AgentClient } from '@/lib/agent/client'
+import type { AgentClient, ModelRequest, ModelResponse } from '@/lib/agent/types'
 
 const data: WeeklyReportData = {
   kind: 'weekly',
@@ -20,17 +19,8 @@ const data: WeeklyReportData = {
   insights: [],
 }
 
-function message(text: string, stop: Anthropic.Beta.BetaMessage['stop_reason'] = 'end_turn') {
-  return {
-    id: 'm',
-    type: 'message',
-    role: 'assistant',
-    model: 'claude-opus-5',
-    content: text ? [{ type: 'text', text, citations: null }] : [],
-    stop_reason: stop,
-    stop_sequence: null,
-    usage: { input_tokens: 1, output_tokens: 1 },
-  } as unknown as Anthropic.Beta.BetaMessage
+function reply(text: string, stopReason: ModelResponse['stopReason'] = 'end_turn'): ModelResponse {
+  return { content: text ? [{ type: 'text', text }] : [], stopReason }
 }
 
 beforeEach(() => {
@@ -38,26 +28,23 @@ beforeEach(() => {
 })
 
 describe('generateReport', () => {
-  it('asks Claude to phrase the JSON data with no tools at high effort', async () => {
-    const calls: Anthropic.Beta.MessageCreateParamsNonStreaming[] = []
+  it('asks the model to phrase the JSON data with no tools at high effort', async () => {
+    const calls: ModelRequest[] = []
     const client: AgentClient = {
-      async createMessage(params) {
-        calls.push(params)
-        return message('<b>Weekly report</b>\nSpent $165.')
+      async createMessage(request) {
+        calls.push(request)
+        return reply('<b>Weekly report</b>\nSpent $165.')
       },
     }
     const out = await generateReport(data, client)
     expect(out).toBe('<b>Weekly report</b>\nSpent $165.')
-    expect(calls[0].model).toBe('claude-opus-5')
-    expect(calls[0].output_config).toEqual({ effort: 'high' })
-    expect(calls[0].max_tokens).toBe(3000)
+    expect(calls[0].effort).toBe('high')
+    expect(calls[0].maxTokens).toBe(3000)
     expect(calls[0].tools).toBeUndefined()
-    expect(calls[0].fallbacks).toBe('default')
-    const userTurn = calls[0].messages[0].content as string
-    expect(userTurn).toContain('"expensesUsd":165')
+    expect(calls[0].messages[0].content).toContain('"expensesUsd":165')
   })
 
-  it('falls back to the deterministic renderer when Claude errors', async () => {
+  it('falls back to the deterministic renderer when the model errors', async () => {
     const client: AgentClient = {
       async createMessage() {
         throw new Error('overloaded')
@@ -69,8 +56,8 @@ describe('generateReport', () => {
   })
 
   it('falls back on a refusal or an empty answer', async () => {
-    const refusing: AgentClient = { async createMessage() { return message('', 'refusal') } }
-    const empty: AgentClient = { async createMessage() { return message('') } }
+    const refusing: AgentClient = { async createMessage() { return reply('', 'refusal') } }
+    const empty: AgentClient = { async createMessage() { return reply('') } }
     expect(await generateReport(data, refusing)).toContain('<b>Weekly report</b>')
     expect(await generateReport(data, empty)).toContain('<b>Weekly report</b>')
   })

@@ -1,9 +1,11 @@
 // Read-only tools for the wealth-manager agent. Every executor takes the
 // finance-scoped service client + the verified user id, returns JSON, and
 // reports money in USD (native amount + currency alongside where useful).
+// Schemas are closed (additionalProperties: false) and their descriptions say
+// WHEN to call the tool — that trigger text is what drives tool selection.
 // v2 write tools (budgets) will join this file behind the same interface.
 
-import type Anthropic from '@anthropic-ai/sdk'
+import type { ToolDefinition } from './types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { toUsd } from '@/lib/fx'
 import {
@@ -43,30 +45,27 @@ const DATE = { type: 'string', description: 'YYYY-MM-DD' } as const
 function schema(
   properties: Record<string, unknown>,
   required: string[] = []
-): Anthropic.Beta.BetaTool['input_schema'] {
+): Record<string, unknown> {
   return { type: 'object', properties, required, additionalProperties: false }
 }
 
-export const TOOL_DEFINITIONS: Anthropic.Beta.BetaTool[] = [
+export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'get_financial_overview',
     description:
       'Call this when the user asks for their net worth, overall financial position, this month at a glance, or "how am I doing". Returns net worth (assets minus debt), this month\'s income/expenses/net, budget pacing, and the top spending categories this month. All amounts USD.',
-    strict: true,
     input_schema: schema({}),
   },
   {
     name: 'get_accounts',
     description:
       'Call this when the user asks about a specific account, account balances, how much cash they have, or what they owe on a card or loan. Returns every live account with its native balance, currency and USD equivalent. Debt balances are negative.',
-    strict: true,
     input_schema: schema({}),
   },
   {
     name: 'query_transactions',
     description:
       'Call this when the user asks about specific transactions: biggest/largest expenses, what they spent at a merchant, recent purchases, or income received. Use sort="amount" for "biggest" questions. Bookkeeping balance-adjustment rows are excluded. Defaults to the last 90 days when no dates are given.',
-    strict: true,
     input_schema: schema({
       from_date: { ...DATE, description: 'Inclusive start date, YYYY-MM-DD. Default: 90 days ago.' },
       to_date: { ...DATE, description: 'Inclusive end date, YYYY-MM-DD. Default: today.' },
@@ -82,7 +81,6 @@ export const TOOL_DEFINITIONS: Anthropic.Beta.BetaTool[] = [
     name: 'get_spending_by_category',
     description:
       'Call this when the user asks where their money went, spending by category, or their biggest expense categories for a period. Returns expense totals rolled up to parent categories with a subcategory breakdown, sorted by amount. Bookkeeping rows excluded.',
-    strict: true,
     input_schema: schema(
       {
         from_date: { ...DATE, description: 'Inclusive start date.' },
@@ -95,7 +93,6 @@ export const TOOL_DEFINITIONS: Anthropic.Beta.BetaTool[] = [
     name: 'get_monthly_cashflow',
     description:
       'Call this when the user asks for income or expenses over time, a monthly table, trends, savings per month, or year-over-year change. Returns one row per calendar month (oldest first) with income, expenses and net, plus a year-over-year comparison for the latest full month when 13+ months are available. Ask for 13 or 24 months for YoY questions.',
-    strict: true,
     input_schema: schema({
       months: { type: 'integer', description: 'Number of trailing calendar months including the current one, 1–36. Default 12.' },
     }),
@@ -104,7 +101,6 @@ export const TOOL_DEFINITIONS: Anthropic.Beta.BetaTool[] = [
     name: 'get_budget_status',
     description:
       'Call this when the user asks about budgets, whether they are on track, which categories risk going over budget this month, how much budget is left, or how they did against budget in a past month. Returns each budget with spent, remaining, percent used, the straight-line projected month-end spend and a status (on_track, warning = projected to exceed, over_budget = already exceeded), riskiest first.',
-    strict: true,
     input_schema: schema({
       month: { type: 'string', description: 'YYYY-MM. Default: the current month. Past months are evaluated over their full length.' },
     }),
@@ -113,14 +109,12 @@ export const TOOL_DEFINITIONS: Anthropic.Beta.BetaTool[] = [
     name: 'get_insights',
     description:
       'Call this when the user asks for insights, advice, what to watch out for, anything unusual, or an overall check-up. Returns the ranked findings from the deterministic insights engine (budget pacing, category anomalies vs trailing average, upcoming card payments, low cash buffer, savings rate).',
-    strict: true,
     input_schema: schema({}),
   },
   {
     name: 'get_net_worth_history',
     description:
       'Call this when the user asks how their net worth has changed, net worth over time, or progress since a date. Returns daily net-worth points from balance snapshots between the dates, the start/end values and the change. If history begins after the requested start, the response says so — tell the user.',
-    strict: true,
     input_schema: schema({
       from_date: { ...DATE, description: 'Inclusive start date. Default: 90 days ago.' },
       to_date: { ...DATE, description: 'Inclusive end date. Default: today.' },
@@ -130,7 +124,6 @@ export const TOOL_DEFINITIONS: Anthropic.Beta.BetaTool[] = [
     name: 'log_transaction',
     description:
       'Call this when the user\'s message is a transaction to record rather than a question — e.g. "$12 coffee at Blue Bottle", "paid 2,500 pesos for gas", "got paid 3000". Pass the user\'s text verbatim. The pipeline sends its own confirmation card, so reply with nothing else after calling it.',
-    strict: true,
     input_schema: schema({ text: { type: 'string', description: 'The user\'s message, verbatim.' } }, ['text']),
   },
 ]

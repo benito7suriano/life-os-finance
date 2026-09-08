@@ -10,7 +10,7 @@ import {
   type TelegramMessage,
 } from '@/lib/telegram/client'
 import { sendHtml } from '@/lib/telegram/send-html'
-import { hasAnthropicKey } from '@/lib/agent/client'
+import { hasAgentKey } from '@/lib/agent/client'
 import { runWealthAgent } from '@/lib/agent/run'
 import { runReportForChannel } from '@/lib/reports/deliver'
 import type { ReportKind } from '@/lib/reports/schedule'
@@ -55,15 +55,15 @@ export type Defer = (fn: () => Promise<void>) => void
 export type IncomingRoute = 'capture' | 'agent'
 
 /** Media always goes to extraction. Text goes to the agent unless the bot is
- * mid-clarification (the reply is an answer, not a question) or no Anthropic
+ * mid-clarification (the reply is an answer, not a question) or no model
  * key is configured (today's behaviour). */
 export function classifyIncoming(
   input: { kind: ExtractorInput['kind'] },
-  flags: { hasActiveClarification: boolean; hasAnthropicKey: boolean }
+  flags: { hasActiveClarification: boolean; hasAgentKey: boolean }
 ): IncomingRoute {
   if (input.kind !== 'text') return 'capture'
   if (flags.hasActiveClarification) return 'capture'
-  return flags.hasAnthropicKey ? 'agent' : 'capture'
+  return flags.hasAgentKey ? 'agent' : 'capture'
 }
 
 const HELP_TEXT = [
@@ -160,7 +160,7 @@ export async function handleMessage(
   const route = classifyIncoming(input, {
     hasActiveClarification:
       input.kind === 'text' ? await hasActiveClarification(supabase, chatId) : false,
-    hasAnthropicKey: hasAnthropicKey(),
+    hasAgentKey: hasAgentKey(),
   })
 
   if (route === 'agent' && input.kind === 'text') {

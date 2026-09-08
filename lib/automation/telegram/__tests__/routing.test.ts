@@ -55,7 +55,7 @@ function db(opts: { activeClarifying?: boolean } = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.spyOn(console, 'error').mockImplementation(() => {})
-  vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
+  vi.stubEnv('GEMINI_API_KEY', 'sk-test')
   vi.mocked(extractTransaction).mockResolvedValue({
     amount: 5, currency: 'USD', merchant: 'Cafe', categoryHint: null, accountHint: null,
     date: '2026-09-15', dateAmbiguous: false, notes: null, direction: 'expense', confidence: 0.9,
@@ -69,10 +69,10 @@ afterEach(() => {
 
 describe('classifyIncoming', () => {
   it('sends media to capture, questions to the agent, and clarification replies to capture', () => {
-    expect(classifyIncoming({ kind: 'image' }, { hasActiveClarification: false, hasAnthropicKey: true })).toBe('capture')
-    expect(classifyIncoming({ kind: 'text' }, { hasActiveClarification: true, hasAnthropicKey: true })).toBe('capture')
-    expect(classifyIncoming({ kind: 'text' }, { hasActiveClarification: false, hasAnthropicKey: true })).toBe('agent')
-    expect(classifyIncoming({ kind: 'text' }, { hasActiveClarification: false, hasAnthropicKey: false })).toBe('capture')
+    expect(classifyIncoming({ kind: 'image' }, { hasActiveClarification: false, hasAgentKey: true })).toBe('capture')
+    expect(classifyIncoming({ kind: 'text' }, { hasActiveClarification: true, hasAgentKey: true })).toBe('capture')
+    expect(classifyIncoming({ kind: 'text' }, { hasActiveClarification: false, hasAgentKey: true })).toBe('agent')
+    expect(classifyIncoming({ kind: 'text' }, { hasActiveClarification: false, hasAgentKey: false })).toBe('capture')
   })
 })
 
@@ -97,8 +97,8 @@ describe('handleMessage routing', () => {
     expect(mergeClarification).toHaveBeenCalled()
   })
 
-  it('falls back to extraction when no Anthropic key is configured', async () => {
-    vi.stubEnv('ANTHROPIC_API_KEY', '')
+  it('falls back to extraction when no Gemini key is configured', async () => {
+    vi.stubEnv('GEMINI_API_KEY', '')
     const { supabase } = db()
     await handleMessage(supabase, textMessage('$12 coffee'))
 
