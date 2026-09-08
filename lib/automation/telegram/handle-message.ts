@@ -1,12 +1,19 @@
-// Inbound Telegram message handling: linking, /help, and the transaction
-// intake flow (extraction → resolution → clarification or confirm card).
+// Inbound Telegram message handling: linking, /help, /report, the wealth-
+// manager agent for questions, and the transaction intake flow (extraction →
+// resolution → clarification or confirm card).
 
 import {
   sendMessage,
+  sendChatAction,
   editMessageText,
   downloadFile,
   type TelegramMessage,
 } from '@/lib/telegram/client'
+import { sendHtml } from '@/lib/telegram/send-html'
+import { hasAgentKey } from '@/lib/agent/client'
+import { runWealthAgent } from '@/lib/agent/run'
+import { runReportForChannel } from '@/lib/reports/deliver'
+import type { ReportKind } from '@/lib/reports/schedule'
 import {
   extractTransaction,
   mergeClarification,
@@ -43,10 +50,53 @@ interface ChannelLookup {
   telegram_link_code_expires_at: string | null
 }
 
+/** Runs slow work (agent answers, reports) after the webhook has replied 200.
+ * The route passes Next's `after`; tests omit it and the work runs inline. */
+export type Defer = (fn: () => Promise<void>) => void
+
+export type IncomingRoute = 'capture' | 'agent'
+
+/** Media always goes to extraction. Text goes to the agent unless the bot is
+ * mid-clarification (the reply is an answer, not a question) or no model
+ * key is configured (today's behaviour). */
+export function classifyIncoming(
+  input: { kind: ExtractorInput['kind'] },
+  flags: { hasActiveClarification: boolean; hasAgentKey: boolean }
+): IncomingRoute {
+  if (input.kind !== 'text') return 'capture'
+  if (flags.hasActiveClarification) return 'capture'
+  return flags.hasAgentKey ? 'agent' : 'capture'
+}
+
+const HELP_TEXT = [
+  'Ask me anything about your money, or send me a transaction to log it.',
+  '',
+  'Questions:',
+  '• "What were my biggest expenses last month?"',
+  '• "Show my net worth"',
+  '• "Income for the past 12 months"',
+  '• "Which budgets are at risk?"',
+  '',
+  'Logging:',
+  '• Text: "$12 coffee at Blue Bottle yesterday"',
+  '• Voice: hold the mic button and say it',
+  '• Photo or file: a receipt, statement, or transfer screen',
+  '• Transfers: "moved RD$5,000 from savings to my visa"',
+  '• Paying someone by bank transfer (rent, a person, a bill) is logged as an expense to them',
+  '',
+  'Reports: /report weekly · /report monthly (also sent automatically every Monday and on the 1st).',
+  '',
+  "If something's unclear I'll ask, then show a Confirm/Cancel before saving.",
+].join('\n')
+
 export async function handleMessage(
   supabase: FinanceSupabase,
-  msg: TelegramMessage
+  msg: TelegramMessage,
+  opts: { defer?: Defer } = {}
 ) {
+  // Without a deferral hook the slow work runs inline and is awaited here.
+  const inline: Promise<void>[] = []
+  const defer: Defer = opts.defer ?? ((fn) => { inline.push(fn()) })
   const chatId = msg.chat.id
   const text = msg.text?.trim() ?? ''
 
@@ -84,21 +134,19 @@ export async function handleMessage(
 
   // /help
   if (text === '/help') {
-    await sendMessage(
-      chatId,
-      [
-        'Send me a transaction to log it. Examples:',
-        '',
-        '• Text: "$12 coffee at Blue Bottle yesterday"',
-        '• Voice: hold the mic button and say it',
-        '• Photo: snap a receipt or a bank transfer screen',
-        '• File: a PDF or image of a receipt/statement',
-        '• Transfers: "moved RD$5,000 from savings to my visa" or a payment screenshot',
-        '• Paying someone by bank transfer (rent, a person, a bill) is logged as an expense to them',
-        '',
-        "If something's unclear I'll ask, then show a Confirm/Cancel before saving.",
-      ].join('\n')
-    )
+    await sendMessage(chatId, HELP_TEXT)
+    return
+  }
+
+  // /report [weekly|monthly] — the same code path the daily cron uses.
+  if (text === '/report' || text.startsWith('/report ')) {
+    const kind = text.slice('/report'.length).trim().toLowerCase() || 'weekly'
+    if (kind !== 'weekly' && kind !== 'monthly') {
+      await sendMessage(chatId, 'Usage: /report weekly or /report monthly')
+      return
+    }
+    defer(() => sendReport(supabase, channel, chatId, kind))
+    await Promise.all(inline)
     return
   }
 
@@ -112,7 +160,76 @@ export async function handleMessage(
     return
   }
 
+  const route = classifyIncoming(input, {
+    hasActiveClarification:
+      input.kind === 'text' ? await hasActiveClarification(supabase, chatId) : false,
+    hasAgentKey: hasAgentKey(),
+  })
+
+  if (route === 'agent' && input.kind === 'text') {
+    defer(() => answerWithAgent(supabase, channel, chatId, input.text))
+    await Promise.all(inline)
+    return
+  }
+
   await processIncoming(supabase, channel, chatId, input)
+}
+
+async function hasActiveClarification(supabase: FinanceSupabase, chatId: number): Promise<boolean> {
+  const { data } = await supabase
+    .from('pending_telegram_transactions')
+    .select('id')
+    .eq('telegram_chat_id', chatId)
+    .eq('status', 'clarifying')
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle()
+  return data != null
+}
+
+/** Question → wealth agent → HTML answer. Transaction-shaped text is handed
+ * back to processIncoming by the agent's log_transaction tool, in which case
+ * the confirm card is the reply. */
+async function answerWithAgent(
+  supabase: FinanceSupabase,
+  channel: ChannelInfo,
+  chatId: number,
+  question: string
+): Promise<void> {
+  try {
+    await sendChatAction(chatId, 'typing')
+    const { reply } = await runWealthAgent({
+      supabase,
+      userId: channel.user_id,
+      chatId,
+      question,
+      logTransaction: (text) => processIncoming(supabase, channel, chatId, { kind: 'text', text }),
+    })
+    if (!reply) return
+    await sendHtml(chatId, reply)
+  } catch (err) {
+    console.error('[wealth-agent] failed', err)
+    await sendMessage(chatId, '⚠️ I hit a snag answering that. Try again in a moment.')
+  }
+}
+
+async function sendReport(
+  supabase: FinanceSupabase,
+  channel: ChannelInfo,
+  chatId: number,
+  kind: ReportKind
+): Promise<void> {
+  try {
+    await sendChatAction(chatId, 'typing')
+    await runReportForChannel(
+      supabase,
+      { id: channel.id, user_id: channel.user_id, telegram_chat_id: chatId },
+      kind,
+      new Date()
+    )
+  } catch (err) {
+    console.error(`[reports] /report ${kind} failed`, err)
+    await sendMessage(chatId, "⚠️ I couldn't build that report. Try again in a moment.")
+  }
 }
 
 /**
@@ -459,12 +576,12 @@ async function handleLinkCode(
     [
       "✅ Linked! You're all set.",
       '',
-      'Send me a transaction to log it:',
+      'Ask me anything — "what did I spend on food last month?", "show my net worth" — or send me a transaction to log it:',
       '• "$12 coffee at Blue Bottle"',
       '• A voice note describing the purchase',
       '• A photo of a receipt',
       '',
-      "If something's unclear I'll ask, then show a Confirm/Cancel before saving.",
+      "Type /help for more. If something's unclear I'll ask, then show a Confirm/Cancel before saving.",
     ].join('\n')
   )
 }

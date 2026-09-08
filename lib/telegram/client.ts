@@ -77,6 +77,11 @@ export async function answerCallbackQuery(callbackQueryId: string, text?: string
   })
 }
 
+/** Shows "typing…" in the chat for ~5s — used while the agent works. */
+export async function sendChatAction(chatId: number, action: 'typing' = 'typing') {
+  return callBot<boolean>('sendChatAction', { chat_id: chatId, action })
+}
+
 // ---------------------------------------------------------------------------
 // File downloads (voice notes, photos, etc.)
 
