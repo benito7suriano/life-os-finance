@@ -41,14 +41,25 @@ export interface ResolvedReferences {
 export interface OptionItem {
   id: string
   name: string
+  /** Ranked account lists flag the matcher's best guesses so the keyboard can
+   *  surface them first. Frozen into the pending payload with the list. */
+  suggested?: boolean
 }
 
 export interface ResolutionContext {
   resolved: ResolvedReferences
   /** Direction-filtered, name-ordered — used to build clarification keyboards. */
   categories: OptionItem[]
-  /** created_at-ordered (default account first). */
+  /** Ranked for the SOURCE account question: best guesses for the account
+   *  hint first (flagged `suggested`), then the rest in created_at order. */
   accounts: OptionItem[]
+  /** Ranked for the DESTINATION account question (transfers). */
+  toAccounts: OptionItem[]
+  /** True when the destination resolved from strong evidence (exact name,
+   *  masked or standalone last-4 digits) rather than the tail of an unmasked
+   *  full account number — the latter is how a third party's account can
+   *  collide with the user's own. */
+  toAccountStrong: boolean
 }
 
 interface NamedRow {
@@ -60,8 +71,11 @@ interface MerchantRow extends NamedRow {
   default_category_id?: string | null
 }
 
-interface AccountRow extends NamedRow {
+export interface AccountRow extends NamedRow {
   last_4_digits?: string | null
+  account_number?: string | null
+  currency?: string | null
+  type?: string | null
 }
 
 function bestMatch<T extends NamedRow>(rows: T[], hint: string | null): T | null {
@@ -80,24 +94,217 @@ function bestMatch<T extends NamedRow>(rows: T[], hint: string | null): T | null
   return sub ?? null
 }
 
+// ---------------------------------------------------------------------------
+// Account matching
+//
+// Bank screens describe accounts loosely ("Cuenta de ahorros *****9652",
+// "Tarjeta de crédito / 4857", "Visa Gold USD") while the ledger names them
+// however the user likes ("Popular 9652 (DOP)", "BAC Checking XXXXX9114").
+// Each account is scored against the hint on digits, name tokens, currency
+// and type; the unique top scorer above the threshold resolves, everything
+// above it is surfaced as a suggestion.
+
+/** Digits that appear after a masking run: "*****9652", "XXXX3782", "•••• 1234". */
+const MASKED_TAIL = /[*xX•●#]+\s*-?\s*(\d{4})(?!\d)/g
+/** A standalone 4-digit group: "visa 4521", "/ 4857". */
+const STANDALONE_FOUR = /(?<![\d*xX•●#])(\d{4})(?!\d)/g
+/** An unmasked run of 5+ digits — a full account number. */
+const LONG_NUMBER = /(?<![\d*xX•●#])(\d{5,})(?!\d)/g
+
+const STRONG_DIGITS = 10
+const WEAK_DIGITS = 6
+const FULL_NUMBER = 12
+/** Minimum score for a hint to resolve or be suggested. */
+const ACCOUNT_MATCH_THRESHOLD = 3
+
+const NAME_STOPWORDS = new Set([
+  'cuenta', 'account', 'acct', 'the', 'del', 'las', 'los', 'mi', 'my',
+  'tarjeta', 'card', 'banco', 'bank', 'number', 'numero', 'num', 'no',
+])
+
+const CURRENCY_WORDS: Array<[RegExp, string]> = [
+  [/\b(usd|us\$|d[oó]lares?|dollars?)\b|us\$/i, 'USD'],
+  [/\b(dop|rd\$|pesos?)\b|rd\$/i, 'DOP'],
+  [/\b(eur|euros?)\b|€/i, 'EUR'],
+]
+
+const TYPE_WORDS: Array<[RegExp, string]> = [
+  [/ahorros?|savings?/i, 'savings'],
+  [/corriente|checking|cheques?/i, 'checking'],
+  [/cr[eé]dito|credit|visa|amex|mastercard|tarjeta|card/i, 'credit_card'],
+  [/efectivo|cash|wallet|billetera/i, 'wallet'],
+  [/pr[eé]stamo|loan/i, 'loan'],
+]
+
+interface DigitToken {
+  tail: string
+  full: string
+  strong: boolean
+}
+
+function digitTokens(hint: string): DigitToken[] {
+  const tokens: DigitToken[] = []
+  for (const m of hint.matchAll(MASKED_TAIL)) {
+    tokens.push({ tail: m[1], full: m[1], strong: true })
+  }
+  for (const m of hint.matchAll(STANDALONE_FOUR)) {
+    tokens.push({ tail: m[1], full: m[1], strong: true })
+  }
+  for (const m of hint.matchAll(LONG_NUMBER)) {
+    tokens.push({ tail: m[1].slice(-4), full: m[1], strong: false })
+  }
+  return tokens
+}
+
+/** Every 4-digit identifier the ledger knows for an account. */
+function accountDigitIds(row: AccountRow): Set<string> {
+  const ids = new Set<string>()
+  if (row.last_4_digits) ids.add(row.last_4_digits.slice(-4))
+  if (row.account_number) ids.add(row.account_number.replace(/\D/g, '').slice(-4))
+  for (const run of row.name.match(/\d{4,}/g) ?? []) ids.add(run.slice(-4))
+  ids.delete('')
+  return ids
+}
+
+function nameTokens(s: string): string[] {
+  return normalizeName(s)
+    .split(/[^a-z0-9]+/)
+    .filter(t => t.length >= 3 && !/^\d+$/.test(t) && !NAME_STOPWORDS.has(t))
+}
+
+function currencyMentioned(hint: string): string | null {
+  for (const [re, code] of CURRENCY_WORDS) if (re.test(hint)) return code
+  return null
+}
+
+function typeMentioned(hint: string): string | null {
+  for (const [re, type] of TYPE_WORDS) if (re.test(hint)) return type
+  return null
+}
+
+interface AccountScore {
+  row: AccountRow
+  score: number
+  strong: boolean
+}
+
+function scoreAccount(row: AccountRow, hint: string): AccountScore {
+  let score = 0
+  let strong = false
+
+  // Digits.
+  const ids = accountDigitIds(row)
+  const accountNumber = row.account_number?.replace(/\D/g, '') ?? null
+  for (const tok of digitTokens(hint)) {
+    if (accountNumber && tok.full === accountNumber) {
+      score = Math.max(score, FULL_NUMBER)
+      strong = true
+    } else if (ids.has(tok.tail)) {
+      score = Math.max(score, tok.strong ? STRONG_DIGITS : WEAK_DIGITS)
+      strong = strong || tok.strong
+    }
+  }
+
+  // Name.
+  const name = normalizeName(row.name)
+  const needle = normalizeName(hint)
+  if (name && name === needle) {
+    score += 8
+    strong = true
+  } else if (name.length >= 3 && needle.includes(name)) {
+    score += 6
+    strong = true
+  } else if (needle.length >= 3 && name.includes(needle)) {
+    score += 5
+    strong = true
+  } else {
+    const rowTokens = new Set(nameTokens(row.name))
+    for (const t of nameTokens(hint)) if (rowTokens.has(t)) score += 3
+  }
+
+  // Currency: an explicit mention is decisive between twins ("Wallet (USD)"
+  // vs "Wallet (DOP)") and rules out cross-currency lookalikes.
+  const currency = currencyMentioned(hint)
+  if (currency && row.currency) {
+    score += currency === row.currency.toUpperCase() ? 2 : -3
+  }
+
+  // Type: weak bonus only — banks and the ledger disagree on labels
+  // ("Cuenta de ahorros" may well be a checking account in the ledger).
+  const type = typeMentioned(hint)
+  if (type && row.type === type) score += 1
+
+  return { row, score, strong }
+}
+
+export interface AccountMatch {
+  /** Unique top scorer above the threshold, or null (no match / ambiguous). */
+  best: AccountRow | null
+  /** True when `best` resolved from strong evidence (see ResolutionContext). */
+  strong: boolean
+  /** All candidates above the threshold, best first. */
+  suggestions: AccountRow[]
+}
+
 /**
- * Account matching is more permissive than generic name matching:
- * - Also matches last-4-digits anywhere in the hint (e.g. "visa gold 4521").
- * - Falls back to substring on name.
+ * Scores every account against a free-text hint. Resolves to the unique top
+ * scorer; two accounts tied at the top (e.g. sharing last-4 digits) resolve to
+ * nothing and are both suggested so the user picks.
  */
-function matchAccount(rows: AccountRow[], hint: string | null): AccountRow | null {
-  if (!hint) return null
-  const lower = hint.trim().toLowerCase()
-  if (!lower) return null
+export function matchAccount(rows: AccountRow[], hint: string | null): AccountMatch {
+  const trimmed = hint?.trim() ?? ''
+  if (!trimmed) return { best: null, strong: false, suggestions: [] }
 
-  // 1. last_4_digits match
-  const byDigits = rows.find(
-    r => r.last_4_digits && lower.includes(r.last_4_digits)
-  )
-  if (byDigits) return byDigits
+  const scored = rows
+    .map(r => scoreAccount(r, trimmed))
+    .filter(s => s.score >= ACCOUNT_MATCH_THRESHOLD)
+    .sort((a, b) => b.score - a.score)
 
-  // 2. fallback to name match
-  return bestMatch(rows, hint)
+  const suggestions = scored.map(s => s.row)
+  if (scored.length === 0) return { best: null, strong: false, suggestions }
+  if (scored.length > 1 && scored[0].score === scored[1].score) {
+    return { best: null, strong: false, suggestions }
+  }
+  return { best: scored[0].row, strong: scored[0].strong, suggestions }
+}
+
+/**
+ * Orders accounts for a keyboard: suggestions first (flagged), then the rest
+ * in their original order.
+ */
+export function rankAccountOptions(
+  rows: AccountRow[],
+  suggestions: AccountRow[]
+): OptionItem[] {
+  const suggestedIds = new Set(suggestions.map(s => s.id))
+  const head = suggestions.map(({ id, name }) => ({ id, name, suggested: true }))
+  const tail = rows
+    .filter(r => !suggestedIds.has(r.id))
+    .map(({ id, name }) => ({ id, name }))
+  return [...head, ...tail]
+}
+
+/**
+ * Re-frames a "transfer" the extractor read off a payment screen as what it
+ * is when the money is going to somebody else: an expense paid to the
+ * counterparty from the source account. The destination account number is
+ * kept in the notes for the record.
+ */
+export function toThirdPartyExpense(
+  extracted: ExtractedTransaction
+): ExtractedTransaction {
+  const payee = extracted.counterparty?.trim() || extracted.merchant?.trim() || null
+  const destination = extracted.toAccountHint?.trim() || null
+  const notes = [extracted.notes?.trim() || null, destination ? `To: ${destination}` : null]
+    .filter((n): n is string => !!n && !(extracted.notes ?? '').includes(n))
+  return {
+    ...extracted,
+    direction: 'expense',
+    merchant: payee,
+    counterparty: payee,
+    toAccountHint: null,
+    notes: notes.length > 0 ? notes.join(' · ') : null,
+  }
 }
 
 const CLOSEST_CATEGORY_THRESHOLD = 0.72
@@ -201,6 +408,10 @@ export function closestCategory(
   return bestScore >= CLOSEST_CATEGORY_THRESHOLD ? best : null
 }
 
+/** Columns the account matcher needs. */
+export const ACCOUNT_MATCH_COLUMNS =
+  'id, name, last_4_digits, account_number, currency, type'
+
 /**
  * @param supabase Finance-scoped Supabase client.
  * @param userId The owning user's id.
@@ -225,7 +436,7 @@ export async function resolveReferences(
       .order('name', { ascending: true }),
     supabase
       .from('accounts')
-      .select('id, name, last_4_digits')
+      .select(ACCOUNT_MATCH_COLUMNS)
       .eq('user_id', userId)
       .is('deleted_at', null)
       .order('created_at', { ascending: true }),
@@ -263,7 +474,8 @@ export async function resolveReferences(
 
   // Account: hint match → single-account default → null (ask the user).
   // Transfers skip the single-account default — they need two distinct accounts.
-  const matchedAccount = matchAccount(accounts, extracted.accountHint)
+  const fromMatch = matchAccount(accounts, extracted.accountHint)
+  const matchedAccount = fromMatch.best
   let accountId: string | null = null
   let accountName: string | null = null
   let accountSource: ResolvedReferences['accountSource'] = null
@@ -279,15 +491,23 @@ export async function resolveReferences(
 
   // Destination account (transfers only). Never allowed to collide with the
   // resolved source account — a bad hint match there means "ask the user".
+  // Only STRONG evidence resolves the destination: the tail of an unmasked
+  // full account number is exactly how somebody else's account collides with
+  // one of the user's own, so that stays a suggestion for the user to confirm.
   let toAccountId: string | null = null
   let toAccountName: string | null = null
   let toAccountSource: ResolvedReferences['toAccountSource'] = null
+  let toAccountStrong = false
+  let toSuggestions: AccountRow[] = []
   if (extracted.direction === 'transfer') {
-    const matchedTo = matchAccount(accounts, extracted.toAccountHint ?? null)
-    if (matchedTo && matchedTo.id !== accountId) {
+    const toMatch = matchAccount(accounts, extracted.toAccountHint ?? null)
+    toSuggestions = toMatch.suggestions.filter(s => s.id !== accountId)
+    const matchedTo = toMatch.best
+    if (matchedTo && matchedTo.id !== accountId && toMatch.strong) {
       toAccountId = matchedTo.id
       toAccountName = matchedTo.name
       toAccountSource = 'hint'
+      toAccountStrong = true
     }
   }
 
@@ -311,6 +531,8 @@ export async function resolveReferences(
       },
     },
     categories: categories.map(({ id, name }) => ({ id, name })),
-    accounts: accounts.map(({ id, name }) => ({ id, name })),
+    accounts: rankAccountOptions(accounts, fromMatch.suggestions),
+    toAccounts: rankAccountOptions(accounts, toSuggestions),
+    toAccountStrong,
   }
 }

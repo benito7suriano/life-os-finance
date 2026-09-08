@@ -7,8 +7,13 @@
 //   co:<pendingId>       category = Other… → ask for a free-text name
 //   cg:<pendingId>       back from the free-text prompt to the category grid
 //   ca:<pendingId>:<i>   account  = payload.options.accounts[i]
-//   ct:<pendingId>:<i>   to_account (transfers) = payload.options.accounts[i]
+//   ct:<pendingId>:<i>   to_account (transfers) = payload.options.toAccounts[i]
+//                        (legacy rows: payload.options.accounts[i])
+//   cp:<pendingId>       "not my account" on the to_account question → the
+//                        transfer becomes an expense paid to the counterparty
 //   cd:<pendingId>:t|y   date = today | yesterday
+//   ea:<pendingId>       from the confirm card: change the (source) account
+//   et:<pendingId>       from the confirm card: change the destination account
 
 import {
   answerCallbackQuery,
@@ -16,7 +21,9 @@ import {
   type TelegramCallbackQuery,
 } from '@/lib/telegram/client'
 import { applyTransactionBalances } from '@/lib/finance/apply-balances'
+import type { ExtractedTransaction } from '../extract-transaction'
 import { fromUsd, toUsd } from '@/lib/fx'
+import { resolveReferences, toThirdPartyExpense } from '../resolve-references'
 import { applyAnswer, askNextQuestion } from './clarification'
 import { categoryTextPrompt, formatPendingSummary } from './format'
 import {
@@ -91,7 +98,10 @@ export async function handleCallback(
       const options =
         field === 'category'
           ? pending.payload.options?.categories
-          : pending.payload.options?.accounts
+          : field === 'to_account'
+            ? (pending.payload.options?.toAccounts ??
+              pending.payload.options?.accounts)
+            : pending.payload.options?.accounts
       const idx = Number(arg)
       const valid =
         pending.status === 'clarifying' &&
@@ -105,12 +115,20 @@ export async function handleCallback(
         await answerCallbackQuery(cb.id, 'That button is stale — use the latest card.')
         return
       }
-      // A transfer's destination can't be its source.
+      // A transfer's two accounts must differ.
       if (
         field === 'to_account' &&
         options![idx].id === pending.payload.resolved.accountId
       ) {
         await answerCallbackQuery(cb.id, "That's the source account — pick a different one.")
+        return
+      }
+      if (
+        field === 'account' &&
+        pending.payload.direction === 'transfer' &&
+        options![idx].id === pending.payload.resolved.toAccountId
+      ) {
+        await answerCallbackQuery(cb.id, "That's the destination account — pick a different one.")
         return
       }
       await answerCallbackQuery(cb.id)
@@ -178,6 +196,40 @@ export async function handleCallback(
       await askNextQuestion(supabase, pending, { categories: [], accounts: [] })
       return
     }
+    case 'cp': {
+      // "Not my account" on the destination question: the money went to
+      // somebody else, so this is an expense paid to them from the source.
+      const valid =
+        pending.status === 'clarifying' &&
+        pending.missing_fields[0] === 'to_account' &&
+        pending.payload.direction === 'transfer'
+      if (!valid) {
+        await answerCallbackQuery(cb.id, 'That button is stale — use the latest card.')
+        return
+      }
+      await answerCallbackQuery(cb.id)
+      await applyAnswer(supabase, pending, {
+        kind: 'extracted',
+        extracted: toThirdPartyExpense(pending.payload.extracted),
+      })
+      return
+    }
+    case 'ea':
+    case 'et': {
+      // From the confirm card: reopen one account question with the ranked
+      // list, keeping everything else the user already confirmed.
+      const field = action === 'ea' ? 'account' : 'to_account'
+      const valid =
+        pending.status === 'confirming' &&
+        (field === 'account' || pending.payload.direction === 'transfer')
+      if (!valid) {
+        await answerCallbackQuery(cb.id, 'That button is stale — use the latest card.')
+        return
+      }
+      await answerCallbackQuery(cb.id)
+      await reopenAccountQuestion(supabase, pending, field)
+      return
+    }
     case 'cd': {
       const valid =
         pending.status === 'clarifying' &&
@@ -208,6 +260,59 @@ export async function handleCallback(
     default:
       await answerCallbackQuery(cb.id)
   }
+}
+
+/**
+ * Clears one account on a confirming row, demotes it to 'clarifying' for that
+ * single field, and renders the question with a freshly ranked list.
+ */
+async function reopenAccountQuestion(
+  supabase: FinanceSupabase,
+  pending: PendingRow,
+  field: 'account' | 'to_account'
+) {
+  const payload = pending.payload
+  const resolved = { ...payload.resolved }
+  const options = { ...(payload.options ?? {}) }
+  if (field === 'account') {
+    resolved.accountId = null
+    resolved.accountName = null
+    resolved.accountSource = null
+    delete options.accounts
+  } else {
+    resolved.toAccountId = null
+    resolved.toAccountName = null
+    resolved.toAccountSource = null
+    delete options.toAccounts
+    // Legacy rows froze the destination list under `accounts`; drop it too so
+    // the ranked list is what gets rendered.
+    delete options.accounts
+  }
+
+  const ctx = await resolveReferences(supabase, pending.user_id, payload.extracted)
+
+  const newPayload: PendingPayload = { ...payload, resolved, options }
+  const { error } = await supabase
+    .from('pending_telegram_transactions')
+    .update({
+      payload: newPayload,
+      status: 'clarifying',
+      missing_fields: [field],
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    })
+    .eq('id', pending.id)
+  if (error) {
+    throw new Error(`pending update failed: ${error.message}`)
+  }
+  pending.payload = newPayload
+  pending.status = 'clarifying'
+  pending.missing_fields = [field]
+
+  await askNextQuestion(supabase, pending, {
+    categories: ctx.categories,
+    accounts: ctx.accounts,
+    toAccounts: ctx.toAccounts,
+  })
 }
 
 async function confirmPending(
@@ -321,12 +426,25 @@ async function confirmPending(
     .maybeSingle()
   const currency = acct?.currency ?? extracted.currency ?? 'USD'
 
+  // A payment read off a two-currency screen (rent paid from a DOP account,
+  // shown as US$1,500 / RD$89,850): book the leg in the account's currency.
+  let amount = extracted.amount
+  if (
+    extracted.toAmount &&
+    extracted.toCurrency &&
+    extracted.currency &&
+    extracted.currency !== currency &&
+    extracted.toCurrency === currency
+  ) {
+    amount = extracted.toAmount
+  }
+
   const insertData: Record<string, unknown> = {
     user_id: pending.user_id,
     type: direction,
     date: txDate,
     description: merchantName ?? 'Telegram entry',
-    amount: extracted.amount,
+    amount,
     currency,
     merchant_id: resolved.merchantId,
     category_id: resolved.categoryId,
@@ -368,7 +486,7 @@ async function confirmPending(
       supabase,
       {
         type: direction,
-        amount: extracted.amount,
+        amount,
         fromAccountId: direction === 'expense' ? resolved.accountId : undefined,
         toAccountId: direction === 'income' ? resolved.accountId : undefined,
       },
@@ -379,8 +497,17 @@ async function confirmPending(
     balanceWarning = true
   }
 
+  // Saved card reflects what was actually stored (account currency).
+  const savedExtracted: ExtractedTransaction = {
+    ...extracted,
+    amount,
+    currency,
+    toAmount: null,
+    toCurrency: null,
+  }
+
   await finalizeSaved(supabase, pending, chatId, messageId, {
-    summary: formatPendingSummary(extracted, resolved, { saved: true }),
+    summary: formatPendingSummary(savedExtracted, resolved, { saved: true }),
     balanceWarning,
   })
 }

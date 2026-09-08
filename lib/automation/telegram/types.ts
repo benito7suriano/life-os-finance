@@ -24,7 +24,11 @@ export interface PendingPayload {
   /** Frozen button lists — callback indexes resolve against these. */
   options?: {
     categories?: OptionItem[]
+    /** Source-account question list (ranked for the source hint). */
     accounts?: OptionItem[]
+    /** Destination-account question list (ranked for the destination hint).
+     *  Legacy rows froze only `accounts`; readers fall back to it. */
+    toAccounts?: OptionItem[]
   }
   /** Set when the user tapped "Other…" on the category grid — the next text
    *  reply is a category name, not a new transaction. */
