@@ -82,10 +82,21 @@ export function formatPendingSummary(
     accountLine = '— (no account!)'
   }
 
+  // A payment made in one currency and received in another (rent paid from a
+  // DOP account to a USD payee) shows both legs.
+  let amountLine = formatAmount(extracted.amount, extracted.currency)
+  if (
+    extracted.toAmount &&
+    extracted.toCurrency &&
+    extracted.toCurrency !== extracted.currency
+  ) {
+    amountLine += ` (= ${formatAmount(extracted.toAmount, extracted.toCurrency)})`
+  }
+
   const lines = [
     opts?.saved ? '' : '🧾 Confirm this transaction?',
     '',
-    `${extracted.direction === 'income' ? 'Income' : 'Expense'}: ${formatAmount(extracted.amount, extracted.currency)}`,
+    `${extracted.direction === 'income' ? 'Income' : 'Expense'}: ${amountLine}`,
     `Merchant: ${merchantName}${merchantSuffix}`,
     `Category: ${categoryLine}`,
     `Account:  ${accountLine}`,
@@ -123,14 +134,37 @@ export function formatKnownSoFar(
   return `🧾 ${extracted.direction === 'income' ? 'Income' : 'Expense'} ${parts.join(' ')}`
 }
 
-export function confirmKeyboard(pendingId: string): InlineKeyboardButton[][] {
-  return [
+/**
+ * Confirm/Cancel plus, when the direction is known, a way to swap the
+ * pre-selected account(s) without cancelling and starting over.
+ */
+export function confirmKeyboard(
+  pendingId: string,
+  direction?: ExtractedTransaction['direction']
+): InlineKeyboardButton[][] {
+  const rows: InlineKeyboardButton[][] = [
     [
       { text: '✅ Confirm', callback_data: `c:${pendingId}` },
       { text: '❌ Cancel', callback_data: `x:${pendingId}` },
     ],
   ]
+  if (direction === 'transfer') {
+    rows.push([
+      { text: '✏️ From account', callback_data: `ea:${pendingId}` },
+      { text: '✏️ To account', callback_data: `et:${pendingId}` },
+    ])
+  } else if (direction) {
+    rows.push([{ text: '✏️ Change account', callback_data: `ea:${pendingId}` }])
+  }
+  return rows
 }
+
+/** "⭐ Popular 9652 (DOP)" for the matcher's best guesses, plain otherwise. */
+function accountButtonText(a: OptionItem): string {
+  return a.suggested ? `⭐ ${a.name}` : a.name
+}
+
+const SUGGESTION_LEGEND = '⭐ = my best guess'
 
 export function cancelRow(pendingId: string): InlineKeyboardButton[] {
   return [{ text: '❌ Cancel', callback_data: `x:${pendingId}` }]
@@ -154,7 +188,11 @@ export function buildQuestion(
   pendingId: string,
   extracted: ExtractedTransaction,
   resolved: Partial<ResolvedReferences>,
-  options: { categories?: OptionItem[]; accounts?: OptionItem[] }
+  options: {
+    categories?: OptionItem[]
+    accounts?: OptionItem[]
+    toAccounts?: OptionItem[]
+  }
 ): { text: string; keyboard: InlineKeyboardButton[][] } {
   const header = formatKnownSoFar(extracted, resolved)
 
@@ -188,30 +226,42 @@ export function buildQuestion(
     case 'account': {
       const accounts = options.accounts ?? []
       const buttons = accounts.map((a, i) => ({
-        text: a.name,
+        text: accountButtonText(a),
         callback_data: `ca:${pendingId}:${i}`,
       }))
-      const question =
+      let question =
         extracted.direction === 'transfer'
           ? '📤 From which account?'
           : '💳 Which account?'
+      if (accounts.some(a => a.suggested)) question += ` (${SUGGESTION_LEGEND})`
       return {
         text: `${header}\n\n${question}`,
         keyboard: [...chunk(buttons, 2), cancelRow(pendingId)],
       }
     }
     case 'to_account': {
-      // Same frozen list as 'account' — callback indexes resolve against
-      // payload.options.accounts. The source account stays tappable but is
-      // rejected at confirm time (from ≠ to).
-      const accounts = options.accounts ?? []
+      // Callback indexes resolve against payload.options.toAccounts (legacy
+      // rows: options.accounts). The source account stays tappable but is
+      // rejected when pressed (from ≠ to).
+      const accounts = options.toAccounts ?? options.accounts ?? []
       const buttons = accounts.map((a, i) => ({
-        text: a.name,
+        text: accountButtonText(a),
         callback_data: `ct:${pendingId}:${i}`,
       }))
+      let question = '📥 To which account?'
+      if (accounts.some(a => a.suggested)) question += ` (${SUGGESTION_LEGEND})`
       return {
-        text: `${header}\n\n📥 To which account?`,
-        keyboard: [...chunk(buttons, 2), cancelRow(pendingId)],
+        text: `${header}\n\n${question}`,
+        keyboard: [
+          ...chunk(buttons, 2),
+          [
+            {
+              text: "🙅 Not my account — it's a payment",
+              callback_data: `cp:${pendingId}`,
+            },
+          ],
+          cancelRow(pendingId),
+        ],
       }
     }
     case 'date':

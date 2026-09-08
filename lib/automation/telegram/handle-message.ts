@@ -18,11 +18,13 @@ import {
   extractTransaction,
   mergeClarification,
   type ExtractedTransaction,
+  type ExtractorContext,
   type ExtractorInput,
 } from '../extract-transaction'
 import {
   closestCategory,
   resolveReferences,
+  toThirdPartyExpense,
   type OptionItem,
 } from '../resolve-references'
 import {
@@ -80,6 +82,7 @@ const HELP_TEXT = [
   '• Voice: hold the mic button and say it',
   '• Photo or file: a receipt, statement, or transfer screen',
   '• Transfers: "moved RD$5,000 from savings to my visa"',
+  '• Paying someone by bank transfer (rent, a person, a bill) is logged as an expense to them',
   '',
   'Reports: /report weekly · /report monthly (also sent automatically every Monday and on the 1st).',
   '',
@@ -299,10 +302,20 @@ export async function processIncoming(
     await supersedeClarifying(supabase, active)
   }
 
-  // Fresh extraction.
+  // Fresh extraction. The user's account list goes along so the model can
+  // name the exact account a screen refers to and tell own-account transfers
+  // from payments to somebody else.
   let extracted: ExtractedTransaction
   try {
-    extracted = await extractTransaction(input)
+    const { data: accountRows } = await supabase
+      .from('accounts')
+      .select('name, type, currency')
+      .eq('user_id', channel.user_id)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+    extracted = await extractTransaction(input, {
+      accounts: (accountRows ?? []) as ExtractorContext['accounts'],
+    })
   } catch (err) {
     const cause = err instanceof Error ? err.message : String(err)
     console.error(`[telegram-webhook] extract failed: ${cause}`)
@@ -313,7 +326,20 @@ export async function processIncoming(
     return
   }
 
-  const ctx = await resolveReferences(supabase, channel.user_id, extracted)
+  let ctx = await resolveReferences(supabase, channel.user_id, extracted)
+
+  // A "transfer" to a named payee whose destination is not clearly one of the
+  // user's own accounts is a payment to that person: log it as an expense
+  // from the source account, not as money moving between two of their
+  // accounts.
+  if (
+    extracted.direction === 'transfer' &&
+    extracted.counterparty &&
+    !ctx.toAccountStrong
+  ) {
+    extracted = toThirdPartyExpense(extracted)
+    ctx = await resolveReferences(supabase, channel.user_id, extracted)
+  }
 
   if (ctx.accounts.length === 0) {
     await sendMessage(
@@ -343,7 +369,9 @@ export async function processIncoming(
 
   // Two-phase: send the card first so we have a message_id to key the row by.
   const sentMessage = (await sendMessage(chatId, initialText, {
-    keyboard: clarifying ? undefined : confirmKeyboard('placeholder'),
+    keyboard: clarifying
+      ? undefined
+      : confirmKeyboard('placeholder', extracted.direction),
   })) as { message_id: number }
 
   const { data: inserted, error: insertErr } = await supabase
@@ -393,11 +421,12 @@ export async function processIncoming(
     await askNextQuestion(supabase, pending, {
       categories: ctx.categories,
       accounts: ctx.accounts,
+      toAccounts: ctx.toAccounts,
     })
   } else {
     // Swap the placeholder keyboard for one carrying the real pending id.
     await editMessageText(chatId, sentMessage.message_id, initialText, {
-      keyboard: confirmKeyboard(pending.id),
+      keyboard: confirmKeyboard(pending.id, extracted.direction),
     })
   }
 }

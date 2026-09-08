@@ -125,7 +125,10 @@ describe('handleMessage routing', () => {
     const { supabase } = db()
     await handleMessage(supabase, textMessage('$12 coffee at Blue Bottle'))
 
-    expect(extractTransaction).toHaveBeenCalledWith({ kind: 'text', text: '$12 coffee at Blue Bottle' })
+    expect(extractTransaction).toHaveBeenCalledWith(
+      { kind: 'text', text: '$12 coffee at Blue Bottle' },
+      expect.objectContaining({ accounts: expect.any(Array) })
+    )
     // The confirm card is the reply — the agent's empty reply is not sent.
     const texts = vi.mocked(sendMessage).mock.calls.map((c) => c[1])
     expect(texts).not.toContain('')
