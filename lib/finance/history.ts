@@ -98,6 +98,54 @@ export function periodOf(dateStr: string): string {
   return dateStr.slice(0, 7)
 }
 
+/** 'YYYY-MM-01' for the month `offset` months away from `now`'s month (local). */
+export function monthStartStr(now: Date, offset: number): string {
+  const d = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+
+export interface ParentSpendItem {
+  id: string
+  name: string
+  amount: number
+  percent: number
+  color: string
+  transactionCount: number
+}
+
+/** Expense spend rolled up to parent categories (child spend counts toward its
+ * parent), bookkeeping excluded, sorted by amount desc — the dashboard's
+ * spending breakdown, reusable over any window of rows. */
+export function rollupSpendingByParent(
+  rows: TxRow[],
+  catCtx: CategoryContext
+): { total: number; categories: ParentSpendItem[] } {
+  const parentSpend: Record<string, { amount: number; count: number }> = {}
+  for (const t of rows) {
+    if (t.type !== 'expense') continue
+    const cid = t.category_id
+    if (!cid || catCtx.excludedCategoryIds.has(cid)) continue
+    const parentId = catCtx.childToParent[cid] ?? cid
+    const entry = parentSpend[parentId] ?? { amount: 0, count: 0 }
+    entry.amount += toUsd(Number(t.amount), t.currency)
+    entry.count += 1
+    parentSpend[parentId] = entry
+  }
+  const total = round2(Object.values(parentSpend).reduce((s, e) => s + e.amount, 0))
+  const categories = catCtx.parents
+    .filter((p) => parentSpend[p.id])
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      amount: round2(parentSpend[p.id].amount),
+      percent: total > 0 ? round2((parentSpend[p.id].amount / total) * 100) : 0,
+      color: p.color || '#94a3b8',
+      transactionCount: parentSpend[p.id].count,
+    }))
+    .sort((a, b) => b.amount - a.amount)
+  return { total, categories }
+}
+
 /** 'Aug 2026' for a 'YYYY-MM' period (locale-safe: built from components). */
 export function monthLabel(period: string): string {
   const [y, m] = period.split('-').map(Number)
