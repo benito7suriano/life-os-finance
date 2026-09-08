@@ -4,6 +4,7 @@ import {
   TOOL_DEFINITIONS,
   executeTool,
   getBudgetStatus,
+  getInsights,
   getMonthlyCashflow,
   getNetWorthHistory,
   getSpendingByCategory,
@@ -246,6 +247,16 @@ describe('getBudgetStatus', () => {
     // Fun: 200 spent of 50 in August; no extrapolation beyond the actual spend.
     const fun = result.budgets.find((b) => b.category === 'Fun')!
     expect(fun).toMatchObject({ spent: 200, projectedMonthEnd: 200, status: 'over_budget' })
+  })
+})
+
+describe('getInsights', () => {
+  it('flattens the three-part headline without a space before punctuation', async () => {
+    const { context } = ctx()
+    const result = await getInsights(context)
+    const savings = result.insights.find((i) => i.kind === 'savings_rate')!
+    expect(savings.headline).toMatch(/^This month you saved \$[\d,.]+\.$/)
+    expect(savings.headline).not.toMatch(/\s[.,!?]/)
   })
 })
 

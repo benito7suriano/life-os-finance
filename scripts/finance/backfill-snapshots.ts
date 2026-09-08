@@ -63,8 +63,10 @@ function arg(name: string): string | undefined {
 async function main() {
   const root = path.resolve(__dirname, '..', '..')
   const hosted = process.argv.includes('--hosted')
-  await loadEnvFile(path.join(root, '.env'))
+  // .env.local (local stack) takes precedence over .env (hosted project);
+  // loadEnvFile never overwrites, so load the higher-priority file first.
   if (!hosted) await loadEnvFile(path.join(root, '.env.local'))
+  await loadEnvFile(path.join(root, '.env'))
 
   const dryRun = process.argv.includes('--dry-run')
   const since = arg('--since')

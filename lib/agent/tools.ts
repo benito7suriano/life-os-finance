@@ -544,7 +544,8 @@ export async function getInsights(ctx: ToolContext) {
     insights: insights.map((i) => ({
       kind: i.kind,
       score: i.score,
-      headline: `${i.headline.lead} ${i.headline.accent} ${i.headline.tail}`.replace(/\s+/g, ' ').trim(),
+      // The parts carry their own spacing (e.g. lead ends with a space).
+      headline: `${i.headline.lead}${i.headline.accent}${i.headline.tail}`.replace(/\s+/g, ' ').trim(),
       body: i.body,
     })),
   }
