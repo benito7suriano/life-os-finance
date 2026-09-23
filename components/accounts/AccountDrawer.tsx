@@ -20,7 +20,6 @@ const accountTypeOptions: { value: AccountType; label: string }[] = [
   { value: 'credit_card', label: 'Credit Card' },
   { value: 'loan', label: 'Loan' },
   { value: 'wallet', label: 'Wallet / Cash' },
-  { value: 'investment', label: 'Investment / Asset' },
 ]
 
 function formatCurrency(amount: number): string {
@@ -59,6 +58,7 @@ export function AccountDrawer({ account, isOpen, onClose, onSave, onDelete, onRe
   const [selectedType, setSelectedType] = useState<AccountType>(account?.type || 'checking')
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset controlled drawer state when its record changes
     setSelectedType(account ? account.type : 'checking')
   }, [account, isOpen])
 

@@ -45,6 +45,7 @@ export default function AutomationPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data loading is the effect's external synchronization
     if (useApi) fetchChannels()
   }, [useApi, fetchChannels])
 

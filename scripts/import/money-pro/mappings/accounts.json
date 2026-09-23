@@ -14,7 +14,7 @@
     ],
     "targetName": "AFP",
     "type": "investment",
-    "assetClass": "pension",
+    "assetClass": "retirement",
     "currency": "USD"
   },
   {
@@ -23,7 +23,7 @@
     ],
     "targetName": "Alpha Inversiones",
     "type": "investment",
-    "assetClass": "investment_fund",
+    "assetClass": "private_investment",
     "currency": "DOP"
   },
   {
@@ -32,7 +32,7 @@
     ],
     "targetName": "Atlántida (Crecimiento)",
     "type": "investment",
-    "assetClass": "investment_fund",
+    "assetClass": "private_investment",
     "currency": "USD"
   },
   {
@@ -41,7 +41,7 @@
     ],
     "targetName": "Atlántida (Liquidez)",
     "type": "investment",
-    "assetClass": "investment_fund",
+    "assetClass": "private_investment",
     "currency": "USD"
   },
   {
@@ -50,7 +50,7 @@
     ],
     "targetName": "Aureus Investments Corp",
     "type": "investment",
-    "assetClass": "investment_fund",
+    "assetClass": "private_investment",
     "currency": "USD"
   },
   {
@@ -167,7 +167,7 @@
     ],
     "targetName": "PaaS",
     "type": "investment",
-    "assetClass": "business",
+    "assetClass": "private_investment",
     "currency": "USD"
   },
   {
@@ -268,7 +268,7 @@
     ],
     "targetName": "Wahoo",
     "type": "investment",
-    "assetClass": "investment_fund",
+    "assetClass": "private_investment",
     "currency": "USD"
   },
   {

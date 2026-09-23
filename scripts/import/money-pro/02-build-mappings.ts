@@ -18,13 +18,7 @@ const MAPPINGS_DIR = path.resolve(__dirname, 'mappings')
 
 type Currency = 'USD' | 'DOP'
 type AccountType = 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet' | 'investment'
-type AssetClass =
-  | 'investment_fund'
-  | 'business'
-  | 'pension'
-  | 'retirement'
-  | 'real_estate'
-  | 'vehicle'
+type AssetClass = 'private_investment' | 'retirement' | 'real_estate' | 'vehicle'
 
 interface AccountInventory {
   name: string
@@ -104,18 +98,18 @@ function classifyAccount(name: string, currencies: Currency[]): {
   }
   // Pension / retirement
   if (/^afp$/i.test(name)) {
-    return { type: 'investment', assetClass: 'pension', currency }
+    return { type: 'investment', assetClass: 'retirement', currency }
   }
   if (/^rl360$/i.test(name)) {
     return { type: 'investment', assetClass: 'retirement', currency }
   }
   // Business
   if (/^paas$/i.test(name)) {
-    return { type: 'investment', assetClass: 'business', currency }
+    return { type: 'investment', assetClass: 'private_investment', currency }
   }
   // Investment funds
   if (/atlántida|atlantida|aureus|alpha inversion|wahoo/i.test(name)) {
-    return { type: 'investment', assetClass: 'investment_fund', currency }
+    return { type: 'investment', assetClass: 'private_investment', currency }
   }
   // Credit cards (Popular 1778 is a Visa card per user, despite its name)
   if (/\bvisa\b|\bamex\b|\bplatinum\b|\bmastercard\b|\bcredit\b|^popular gold|^popular 1778/i.test(name)) {

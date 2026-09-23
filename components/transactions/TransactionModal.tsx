@@ -68,6 +68,7 @@ export function TransactionModal({ isOpen, onClose, onSave, categories, accounts
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset controlled modal state when it opens
       setType(editTransaction?.type || 'expense')
       setDate(editTransaction?.date || new Date().toISOString().split('T')[0])
       setDescription(editTransaction?.description || '')

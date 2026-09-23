@@ -20,12 +20,10 @@ export interface CreditCardProvider {
 export type AccountType = 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet' | 'investment'
 
 export type AssetClass =
-  | 'investment_fund'
-  | 'business'
-  | 'pension'
-  | 'retirement'
   | 'real_estate'
   | 'vehicle'
+  | 'private_investment'
+  | 'retirement'
 
 export type Currency = 'USD' | 'EUR' | 'GBP' | string
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createFinanceClient } from '@/lib/supabase/server'
 import { toUsd, fromUsd } from '@/lib/fx'
 import { applyTransactionBalances, legsFromRow } from '@/lib/finance/apply-balances'
+import { resolveAssetAttribution, validateLedgerTransaction } from '@/lib/finance/transactions'
 
 export async function PUT(
   request: NextRequest,
@@ -33,13 +34,34 @@ export async function PUT(
 
   const body = await request.json()
   const { type, date, description, amount, categoryId, accountId, fromAccountId, toAccountId, toAmount, toCurrency, goalAllocations } = body
+  // The generic transaction modal does not expose asset attribution. Preserve
+  // it unless a caller explicitly supplies either field.
+  const { relatedAssetId: nextRelatedAssetId, assetActivityKind: nextActivityKind } = resolveAssetAttribution(body, existing)
+  const validationError = validateLedgerTransaction({ ...body, relatedAssetId: nextRelatedAssetId, assetActivityKind: nextActivityKind })
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
 
-  // Validate
-  if (!type || !description || !amount || amount <= 0) {
-    return NextResponse.json(
-      { error: 'Missing required fields: type, description, amount (> 0)' },
-      { status: 400 }
-    )
+  // Validate and load every referenced account before reversing the old row.
+  // Any validation failure must leave the existing balances untouched.
+  const involvedIds = [...new Set([accountId, fromAccountId, toAccountId, nextRelatedAssetId].filter(Boolean) as string[])]
+  const acctCurrency = new Map<string, string>()
+  let involved: Array<{ id: string; currency: string | null; type: string; asset_class: string | null }> = []
+  if (involvedIds.length > 0) {
+    const { data, error: accountError } = await supabase
+      .from('accounts')
+      .select('id, currency, type, asset_class')
+      .eq('user_id', user.id)
+      .in('id', involvedIds)
+    if (accountError || (data || []).length !== involvedIds.length) {
+      return NextResponse.json({ error: 'Account not found' }, { status: 400 })
+    }
+    involved = data || []
+    for (const account of involved) acctCurrency.set(account.id, account.currency || 'USD')
+  }
+  if (nextRelatedAssetId) {
+    const related = involved.find((account) => account.id === nextRelatedAssetId)
+    if (!related || related.type !== 'investment' || !related.asset_class) {
+      return NextResponse.json({ error: 'Related asset not found' }, { status: 400 })
+    }
   }
 
   // Reverse the old balance effects. legsFromRow uses the stored to_amount for
@@ -80,17 +102,6 @@ export async function PUT(
 
   // Update the transaction record, re-stamping currency fields from the
   // (possibly changed) accounts — mirrors the create path.
-  const involvedIds = [accountId, fromAccountId, toAccountId].filter(Boolean) as string[]
-  const acctCurrency = new Map<string, string>()
-  if (involvedIds.length > 0) {
-    const { data: involved } = await supabase
-      .from('accounts')
-      .select('id, currency')
-      .in('id', involvedIds)
-    for (const a of involved || []) {
-      acctCurrency.set(a.id, a.currency || 'USD')
-    }
-  }
   const sourceAccountId = type === 'transfer' ? fromAccountId : accountId
   const sourceCurrency = acctCurrency.get(sourceAccountId) ?? 'USD'
 
@@ -102,6 +113,8 @@ export async function PUT(
     currency: sourceCurrency,
     to_amount: null,
     to_currency: null,
+    related_asset_id: nextRelatedAssetId || null,
+    asset_activity_kind: nextActivityKind || null,
   }
 
   // Amount credited to the destination of a transfer (converted/explicit for

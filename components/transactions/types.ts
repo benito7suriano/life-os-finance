@@ -12,7 +12,7 @@ export interface Category {
 export interface Account {
   id: string
   name: string
-  type: 'checking' | 'savings' | 'credit_card' | 'wallet'
+  type: 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet' | 'investment'
   icon: string
   /** Native currency of this account (e.g. 'USD', 'DOP'). */
   currency?: string
@@ -56,6 +56,8 @@ export interface Transaction {
   source: 'manual' | 'import' | 'telegram'
   /** For transfers with goal contributions: the allocation breakdown */
   goalAllocations?: GoalAllocation[]
+  relatedAssetId?: string
+  assetActivityKind?: import('@/lib/assets/types').AssetActivityKind
 }
 
 /** Allocation of a transfer amount to a specific goal */

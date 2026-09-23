@@ -49,6 +49,7 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only randomization avoids hydration mismatch
     setGreeting(pickGreeting())
   }, [])
 

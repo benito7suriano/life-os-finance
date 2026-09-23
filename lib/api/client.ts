@@ -1,6 +1,9 @@
 // Typed fetch wrappers for the internal /api/finance/* routes.
 // Frontend code should call these — never fetch directly, never import Supabase client.
 
+import type { AssetActivity, AssetDetail, AssetOwner, AssetsSummary, AssetWriteInput } from '@/lib/assets/types'
+import type { AssetActivityInput } from '@/lib/assets/activity'
+
 const BASE = '/api/finance'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -110,6 +113,60 @@ export function deleteAccount(id: string) {
 
 export function restoreAccount(id: string) {
   return request<{ account: unknown }>(`/accounts/${id}/restore`, { method: 'PATCH' })
+}
+
+// ── Assets ──────────────────────────────────────────────────────────────────
+
+export function listAssets(params?: { archived?: boolean }) {
+  return request<{ assets: AssetDetail[]; summary: AssetsSummary }>(`/assets${toQuery(params as Record<string, unknown> | undefined)}`)
+}
+
+export function getAsset(id: string) {
+  return request<{ asset: AssetDetail }>(`/assets/${id}`)
+}
+
+export function createAsset(input: AssetWriteInput) {
+  return request<{ id: string }>(`/assets`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function updateAsset(id: string, input: Partial<AssetWriteInput>) {
+  return request<{ asset: AssetDetail }>(`/assets/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function archiveAsset(id: string) {
+  return request<{ success: true }>(`/assets/${id}`, { method: 'DELETE' })
+}
+
+export function restoreAsset(id: string) {
+  return request<{ asset: AssetDetail }>(`/assets/${id}/restore`, { method: 'PATCH' })
+}
+
+export function recordAssetValuation(id: string, input: { totalValue: number; valuedOn: string; source?: string; notes?: string }) {
+  return request<{ asset: AssetDetail }>(`/assets/${id}/valuations`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function listAssetActivity(id: string, params?: { page?: number; limit?: number }) {
+  return request<{ activity: AssetActivity[]; totalCount: number; totalPages: number }>(`/assets/${id}/activity${toQuery(params as Record<string, unknown> | undefined)}`)
+}
+
+export function createAssetActivity(id: string, input: AssetActivityInput) {
+  return request<{ transaction: unknown }>(`/assets/${id}/activity`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function listAssetOwners(params?: { archived?: boolean }) {
+  return request<{ owners: AssetOwner[] }>(`/asset-owners${toQuery(params as Record<string, unknown> | undefined)}`)
+}
+
+export function createAssetOwner(input: { name: string; ownerType?: string; includeInNetWorth?: boolean }) {
+  return request<{ owner: AssetOwner }>(`/asset-owners`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function updateAssetOwner(id: string, input: { name?: string; ownerType?: string; includeInNetWorth?: boolean }) {
+  return request<{ owner: AssetOwner }>(`/asset-owners/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function archiveAssetOwner(id: string) {
+  return request<{ success: true }>(`/asset-owners/${id}`, { method: 'DELETE' })
 }
 
 // ── Budgets ─────────────────────────────────────────────────────────────────
