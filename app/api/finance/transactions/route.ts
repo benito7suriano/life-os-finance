@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createFinanceClient } from '@/lib/supabase/server'
-import { toUsd, fromUsd } from '@/lib/fx'
-import { applyTransactionBalances } from '@/lib/finance/apply-balances'
+import { toUsd } from '@/lib/fx'
+import { createLedgerTransaction, validateLedgerTransaction } from '@/lib/finance/transactions'
 
 export async function GET(request: NextRequest) {
   const supabase = await createFinanceClient()
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
   // Account filter
   if (accountIds.length > 0) {
     query = query.or(
-      `from_account_id.in.(${accountIds.join(',')}),to_account_id.in.(${accountIds.join(',')})`
+      `from_account_id.in.(${accountIds.join(',')}),to_account_id.in.(${accountIds.join(',')}),related_asset_id.in.(${accountIds.join(',')})`
     )
   }
 
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
     if (categoryIds.length > 0) q = q.in('category_id', categoryIds)
     if (accountIds.length > 0) {
       q = q.or(
-        `from_account_id.in.(${accountIds.join(',')}),to_account_id.in.(${accountIds.join(',')})`
+        `from_account_id.in.(${accountIds.join(',')}),to_account_id.in.(${accountIds.join(',')}),related_asset_id.in.(${accountIds.join(',')})`
       )
     }
     if (sources.length > 0) q = q.in('source', sources)
@@ -162,6 +162,8 @@ export async function GET(request: NextRequest) {
       category: t.category,
       fromAccount: t.from_account,
       toAccount: t.to_account,
+      relatedAssetId: t.related_asset_id || undefined,
+      assetActivityKind: t.asset_activity_kind || undefined,
     }
   })
 
@@ -188,133 +190,12 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { type, date, description, amount, categoryId, accountId, fromAccountId, toAccountId, toAmount, toCurrency, goalAllocations } = body
-
-  // Validate required fields
-  if (!type || !description || !amount || amount <= 0) {
-    return NextResponse.json(
-      { error: 'Missing required fields: type, description, amount (> 0)' },
-      { status: 400 }
-    )
-  }
-
-  if (type !== 'transfer' && !categoryId) {
-    return NextResponse.json({ error: 'categoryId is required for income/expense' }, { status: 400 })
-  }
-
-  // Fetch the native currency of every account involved, so we can stamp the
-  // transaction's currency and convert the destination leg of a cross-currency
-  // transfer. Balance updates go through the update_account_balance RPC.
-  const involvedIds = [accountId, fromAccountId, toAccountId].filter(Boolean) as string[]
-  const acctCurrency = new Map<string, string>()
-  if (involvedIds.length > 0) {
-    const { data: involved } = await supabase
-      .from('accounts')
-      .select('id, currency')
-      .in('id', involvedIds)
-    for (const a of involved || []) {
-      acctCurrency.set(a.id, a.currency || 'USD')
-    }
-  }
-
-  // Source-leg currency: the account money left (expense/transfer) or entered (income).
-  const sourceAccountId = type === 'transfer' ? fromAccountId : accountId
-  const sourceCurrency = acctCurrency.get(sourceAccountId) ?? 'USD'
-
-  // Insert transaction
-  const transactionData: Record<string, unknown> = {
-    user_id: user.id,
-    type,
-    date: date || new Date().toISOString().split('T')[0],
-    description,
-    amount,
-    currency: sourceCurrency,
-    source: 'manual',
-    source_app: 'financial-ledger',
-  }
-
-  // Amount credited to the destination of a transfer. Mirrors `amount` for
-  // same-currency transfers; converted/explicit for cross-currency ones.
-  let creditAmount = amount
-
-  if (type === 'expense') {
-    transactionData.from_account_id = accountId
-    transactionData.category_id = categoryId
-  } else if (type === 'income') {
-    transactionData.to_account_id = accountId
-    transactionData.category_id = categoryId
-  } else if (type === 'transfer') {
-    transactionData.from_account_id = fromAccountId
-    transactionData.to_account_id = toAccountId
-    const destCurrency = toCurrency || acctCurrency.get(toAccountId) || sourceCurrency
-    if (destCurrency !== sourceCurrency) {
-      // Cross-currency: prefer the actual settled amount the caller provides;
-      // otherwise convert source → USD → destination via the central rate.
-      creditAmount = toAmount != null ? Number(toAmount) : fromUsd(toUsd(amount, sourceCurrency), destCurrency)
-      transactionData.to_currency = destCurrency
-      transactionData.to_amount = creditAmount
-    }
-  }
-
-  const { data: transaction, error } = await supabase
-    .from('transactions')
-    .insert(transactionData)
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  // Apply balance effects atomically via the update_account_balance RPC.
-  // Insert + balance updates are separate statements (PostgREST has no
-  // cross-statement transactions); on failure, roll back the inserted row.
+  const validationError = validateLedgerTransaction(body)
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
   try {
-    await applyTransactionBalances(
-      supabase,
-      {
-        type,
-        amount,
-        toAmount: type === 'transfer' ? creditAmount : undefined,
-        fromAccountId: type === 'expense' ? accountId : type === 'transfer' ? fromAccountId : undefined,
-        toAccountId: type === 'income' ? accountId : type === 'transfer' ? toAccountId : undefined,
-      },
-      1
-    )
-  } catch (e) {
-    await supabase.from('transactions').delete().eq('id', transaction.id)
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Balance update failed' },
-      { status: 500 }
-    )
+    const transaction = await createLedgerTransaction(supabase, user.id, body)
+    return NextResponse.json({ transaction }, { status: 201 })
+  } catch (cause) {
+    return NextResponse.json({ error: cause instanceof Error ? cause.message : 'Unable to create transaction' }, { status: 500 })
   }
-
-  // Create goal contributions for transfers
-  if (type === 'transfer' && goalAllocations && Array.isArray(goalAllocations)) {
-    for (const allocation of goalAllocations) {
-      if (allocation.goalId && allocation.amount > 0) {
-        await supabase.from('goal_contributions').insert({
-          goal_id: allocation.goalId,
-          transaction_id: transaction.id,
-          amount: allocation.amount,
-          date: date || new Date().toISOString().split('T')[0],
-        })
-
-        // Update goal current_balance
-        const { data: goal } = await supabase
-          .from('goals')
-          .select('current_balance')
-          .eq('id', allocation.goalId)
-          .single()
-        if (goal) {
-          await supabase
-            .from('goals')
-            .update({ current_balance: Number(goal.current_balance) + allocation.amount })
-            .eq('id', allocation.goalId)
-        }
-      }
-    }
-  }
-
-  return NextResponse.json({ transaction }, { status: 201 })
 }

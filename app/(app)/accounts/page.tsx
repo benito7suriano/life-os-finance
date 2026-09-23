@@ -65,6 +65,7 @@ export default function AccountsPage() {
   }, [isAuthed, showArchived])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data loading is the effect's external synchronization
     if (isAuthed) fetchAccounts()
   }, [isAuthed, fetchAccounts])
 

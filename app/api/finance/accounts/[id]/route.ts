@@ -29,6 +29,10 @@ export async function PUT(
     return NextResponse.json({ error: 'Account not found' }, { status: 404 })
   }
 
+  if (existing.type === 'investment') {
+    return NextResponse.json({ error: 'Investment accounts must be managed through the Assets API' }, { status: 409 })
+  }
+
   const body = await request.json()
 
   // Map camelCase body to snake_case for DB

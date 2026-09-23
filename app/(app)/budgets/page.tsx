@@ -82,6 +82,7 @@ export default function BudgetsPage() {
 
   // Fetch when authenticated or the selected month changes.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data loading is the effect's external synchronization
     if (isAuthed) fetchBudgets(selectedMonth)
   }, [isAuthed, selectedMonth, fetchBudgets])
 

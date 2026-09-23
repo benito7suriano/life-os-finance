@@ -9,6 +9,7 @@ const navigationItems: NavigationItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: 'dashboard' },
   { label: 'Transactions', href: '/transactions', icon: 'transactions' },
   { label: 'Accounts', href: '/accounts', icon: 'accounts' },
+  { label: 'Assets', href: '/assets', icon: 'assets' },
   { label: 'Budgets', href: '/budgets', icon: 'budgets' },
   { label: 'Automation', href: '/automation', icon: 'automation' },
 ]

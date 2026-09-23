@@ -19,13 +19,7 @@ const BATCH_SIZE = 500
 
 type Currency = 'USD' | 'DOP'
 type AccountType = 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet' | 'investment'
-type AssetClass =
-  | 'investment_fund'
-  | 'business'
-  | 'pension'
-  | 'retirement'
-  | 'real_estate'
-  | 'vehicle'
+type AssetClass = 'private_investment' | 'retirement' | 'real_estate' | 'vehicle'
 
 interface NormalizedRow {
   sourceFile: number

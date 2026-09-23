@@ -20,13 +20,7 @@ export interface User {
 export type AccountType = 'checking' | 'savings' | 'credit_card' | 'loan' | 'wallet' | 'investment'
 export type Currency = 'USD' | 'EUR' | 'GBP' | 'DOP' | string
 export type PaymentFrequency = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annually'
-export type AssetClass =
-  | 'investment_fund'
-  | 'business'
-  | 'pension'
-  | 'retirement'
-  | 'real_estate'
-  | 'vehicle'
+export type AssetClass = 'real_estate' | 'vehicle' | 'private_investment' | 'retirement'
 
 interface BaseAccount {
   id: string

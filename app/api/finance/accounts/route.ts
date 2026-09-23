@@ -229,6 +229,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  if (type === 'investment') {
+    return NextResponse.json({ error: 'Investment accounts must be created through the Assets API' }, { status: 400 })
+  }
+
   // Debt accounts store balance as a negative number; the UI shows the
   // magnitude, so re-apply the sign here as defense in depth.
   const signedBalance =

@@ -16,12 +16,13 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Circle,
+  Gem,
 } from 'lucide-react'
 
 export interface NavigationItem {
   label: string
   href: string
-  icon?: 'dashboard' | 'transactions' | 'accounts' | 'budgets' | 'automation'
+  icon?: 'dashboard' | 'transactions' | 'accounts' | 'assets' | 'budgets' | 'automation'
   isActive?: boolean
 }
 
@@ -43,6 +44,7 @@ const iconMap = {
   dashboard: LayoutDashboard,
   transactions: Receipt,
   accounts: Wallet,
+  assets: Gem,
   budgets: PiggyBank,
   automation: Zap,
 }

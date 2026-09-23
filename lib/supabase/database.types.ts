@@ -7,13 +7,52 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
   finance: {
     Tables: {
+      account_balance_snapshots: {
+        Row: {
+          account_id: string
+          account_type: string
+          balance: number
+          balance_usd: number
+          created_at: string
+          currency: string
+          id: string
+          snapshot_date: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          account_type: string
+          balance: number
+          balance_usd: number
+          created_at?: string
+          currency?: string
+          id?: string
+          snapshot_date: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          account_type?: string
+          balance?: number
+          balance_usd?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          snapshot_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_balance_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts: {
         Row: {
           account_number: string | null
@@ -122,6 +161,166 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "credit_card_providers"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_owners: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          id: string
+          include_in_net_worth: boolean
+          name: string
+          owner_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          include_in_net_worth?: boolean
+          name: string
+          owner_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          include_in_net_worth?: boolean
+          name?: string
+          owner_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      asset_ownerships: {
+        Row: {
+          asset_account_id: string
+          created_at: string
+          owner_id: string
+          percentage: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_account_id: string
+          created_at?: string
+          owner_id: string
+          percentage: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_account_id?: string
+          created_at?: string
+          owner_id?: string
+          percentage?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_ownerships_asset_account_id_user_id_fkey"
+            columns: ["asset_account_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "asset_profiles"
+            referencedColumns: ["account_id", "user_id"]
+          },
+          {
+            foreignKeyName: "asset_ownerships_owner_id_user_id_fkey"
+            columns: ["owner_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "asset_owners"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      asset_profiles: {
+        Row: {
+          account_id: string
+          created_at: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_valuations: {
+        Row: {
+          account_id: string
+          created_at: string
+          currency: string
+          id: string
+          included_ownership_percentage: number
+          net_worth_value: number
+          notes: string | null
+          ownership_snapshot: Json
+          source: string | null
+          total_value: number
+          user_id: string
+          valued_on: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          currency: string
+          id?: string
+          included_ownership_percentage: number
+          net_worth_value: number
+          notes?: string | null
+          ownership_snapshot?: Json
+          source?: string | null
+          total_value: number
+          user_id: string
+          valued_on: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          included_ownership_percentage?: number
+          net_worth_value?: number
+          notes?: string | null
+          ownership_snapshot?: Json
+          source?: string | null
+          total_value?: number
+          user_id?: string
+          valued_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_valuations_account_id_user_id_fkey"
+            columns: ["account_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "asset_profiles"
+            referencedColumns: ["account_id", "user_id"]
           },
         ]
       }
@@ -498,7 +697,9 @@ export type Database = {
           created_at: string
           expires_at: string
           id: string
+          missing_fields: string[]
           payload: Json
+          status: string
           telegram_chat_id: number
           telegram_message_id: number
           user_id: string
@@ -508,7 +709,9 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
+          missing_fields?: string[]
           payload: Json
+          status?: string
           telegram_chat_id: number
           telegram_message_id: number
           user_id: string
@@ -518,7 +721,9 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
+          missing_fields?: string[]
           payload?: Json
+          status?: string
           telegram_chat_id?: number
           telegram_message_id?: number
           user_id?: string
@@ -533,9 +738,184 @@ export type Database = {
           },
         ]
       }
+      private_investment_assets: {
+        Row: {
+          account_id: string
+          company_description: string | null
+          company_name: string | null
+          cost_basis: number | null
+          investment_date: string | null
+          investment_name: string | null
+          investment_type: string | null
+          shares_or_units: number | null
+          unit_label: string | null
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          account_id: string
+          company_description?: string | null
+          company_name?: string | null
+          cost_basis?: number | null
+          investment_date?: string | null
+          investment_name?: string | null
+          investment_type?: string | null
+          shares_or_units?: number | null
+          unit_label?: string | null
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          account_id?: string
+          company_description?: string | null
+          company_name?: string | null
+          cost_basis?: number | null
+          investment_date?: string | null
+          investment_name?: string | null
+          investment_type?: string | null
+          shares_or_units?: number | null
+          unit_label?: string | null
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "private_investment_assets_account_id_user_id_fkey"
+            columns: ["account_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "asset_profiles"
+            referencedColumns: ["account_id", "user_id"]
+          },
+        ]
+      }
+      real_estate_assets: {
+        Row: {
+          account_id: string
+          city: string | null
+          country: string | null
+          postal_code: string | null
+          primary_residence: boolean
+          property_type: string | null
+          purchase_date: string | null
+          purchase_price: number | null
+          state_province: string | null
+          street: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          city?: string | null
+          country?: string | null
+          postal_code?: string | null
+          primary_residence?: boolean
+          property_type?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          state_province?: string | null
+          street?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          city?: string | null
+          country?: string | null
+          postal_code?: string | null
+          primary_residence?: boolean
+          property_type?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          state_province?: string | null
+          street?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "real_estate_assets_account_id_user_id_fkey"
+            columns: ["account_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "asset_profiles"
+            referencedColumns: ["account_id", "user_id"]
+          },
+        ]
+      }
+      retirement_assets: {
+        Row: {
+          account_id: string
+          account_reference_last4: string | null
+          contribution_amount: number | null
+          contribution_frequency: string | null
+          plan_name: string | null
+          plan_type: string | null
+          provider_name: string | null
+          start_date: string | null
+          target_retirement_date: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          account_reference_last4?: string | null
+          contribution_amount?: number | null
+          contribution_frequency?: string | null
+          plan_name?: string | null
+          plan_type?: string | null
+          provider_name?: string | null
+          start_date?: string | null
+          target_retirement_date?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          account_reference_last4?: string | null
+          contribution_amount?: number | null
+          contribution_frequency?: string | null
+          plan_name?: string | null
+          plan_type?: string | null
+          provider_name?: string | null
+          start_date?: string | null
+          target_retirement_date?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retirement_assets_account_id_user_id_fkey"
+            columns: ["account_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "asset_profiles"
+            referencedColumns: ["account_id", "user_id"]
+          },
+        ]
+      }
+      telegram_agent_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          telegram_chat_id: number
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          telegram_chat_id: number
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          telegram_chat_id?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
+          asset_activity_kind: string | null
           category_id: string | null
           created_at: string
           currency: string
@@ -545,6 +925,7 @@ export type Database = {
           goal_id: string | null
           id: string
           merchant_id: string | null
+          related_asset_id: string | null
           source: string
           source_app: string
           to_account_id: string | null
@@ -556,6 +937,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          asset_activity_kind?: string | null
           category_id?: string | null
           created_at?: string
           currency?: string
@@ -565,6 +947,7 @@ export type Database = {
           goal_id?: string | null
           id?: string
           merchant_id?: string | null
+          related_asset_id?: string | null
           source?: string
           source_app?: string
           to_account_id?: string | null
@@ -576,6 +959,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          asset_activity_kind?: string | null
           category_id?: string | null
           created_at?: string
           currency?: string
@@ -585,6 +969,7 @@ export type Database = {
           goal_id?: string | null
           id?: string
           merchant_id?: string | null
+          related_asset_id?: string | null
           source?: string
           source_app?: string
           to_account_id?: string | null
@@ -624,6 +1009,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "transactions_related_asset_id_fkey"
+            columns: ["related_asset_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "transactions_to_account_id_fkey"
             columns: ["to_account_id"]
             isOneToOne: false
@@ -659,11 +1051,105 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_assets: {
+        Row: {
+          account_id: string
+          current_mileage: number | null
+          make: string | null
+          mileage_as_of: string | null
+          model: string | null
+          purchase_date: string | null
+          purchase_price: number | null
+          user_id: string
+          vin: string | null
+          year: number | null
+        }
+        Insert: {
+          account_id: string
+          current_mileage?: number | null
+          make?: string | null
+          mileage_as_of?: string | null
+          model?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          user_id: string
+          vin?: string | null
+          year?: number | null
+        }
+        Update: {
+          account_id?: string
+          current_mileage?: number | null
+          make?: string | null
+          mileage_as_of?: string | null
+          model?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          user_id?: string
+          vin?: string | null
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_assets_account_id_user_id_fkey"
+            columns: ["account_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "asset_profiles"
+            referencedColumns: ["account_id", "user_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      create_asset: {
+        Args: {
+          p_category: string
+          p_currency: string
+          p_current_value: number
+          p_details: Json
+          p_name: string
+          p_notes: string
+          p_owners: Json
+          p_valuation_source: string
+          p_valued_on: string
+        }
+        Returns: string
+      }
+      record_asset_valuation: {
+        Args: {
+          p_account_id: string
+          p_notes?: string
+          p_source?: string
+          p_total_value: number
+          p_valued_on: string
+        }
+        Returns: {
+          account_id: string
+          created_at: string
+          currency: string
+          id: string
+          included_ownership_percentage: number
+          net_worth_value: number
+          notes: string | null
+          ownership_snapshot: Json
+          source: string | null
+          total_value: number
+          user_id: string
+          valued_on: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "asset_valuations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      replace_asset_ownerships: {
+        Args: { p_account_id: string; p_owners: Json }
+        Returns: undefined
+      }
       update_account_balance: {
         Args: { p_account_id: string; p_delta: number }
         Returns: undefined
@@ -678,30 +1164,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      kanvas_votes: {
-        Row: {
-          decision_id: string
-          id: string
-          vote: string
-          voted_at: string | null
-          voter: string
-        }
-        Insert: {
-          decision_id: string
-          id?: string
-          vote: string
-          voted_at?: string | null
-          voter: string
-        }
-        Update: {
-          decision_id?: string
-          id?: string
-          vote?: string
-          voted_at?: string | null
-          voter?: string
-        }
-        Relationships: []
-      }
       users: {
         Row: {
           created_at: string
